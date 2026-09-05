@@ -703,6 +703,176 @@ button.ghost:hover {
 }
 
 /* ----------------------------------------------------------
+   Sous-questions notées à crédit partiel (Sections B et C)
+   ---------------------------------------------------------- */
+
+.sous-question-notee {
+  border-top: 1px solid var(--line);
+  padding-top: 1.1rem;
+  margin-top: 1.1rem;
+}
+
+.sous-question-notee:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.sous-question-notee .enonce {
+  font-size: 0.95rem;
+  margin-bottom: 0.6rem;
+}
+
+.demarche-textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  resize: vertical;
+  margin-bottom: 0.6rem;
+  box-sizing: border-box;
+}
+
+.demarche-textarea:focus {
+  border-color: var(--cobalt);
+  outline: none;
+}
+
+.choix-bouton.selectionne {
+  border-color: var(--cobalt);
+  background: var(--cobalt-soft);
+}
+
+.cases-liste {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.case-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.banque-mots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.mot-banque {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--graphite-soft);
+  background: var(--paper);
+}
+
+.emplacements-mots {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.emplacement-mot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.emplacement-mot select {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.4rem 0.6rem;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+}
+
+.sous-question-erreur {
+  color: #7a2b22;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.feedback.partiel {
+  background: var(--cobalt-soft);
+  color: var(--ink);
+  border: 1px solid var(--cobalt);
+}
+
+.fonction-globale-encadre {
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  padding: 0.9rem 1.2rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* QCM à tableau (grille multi-faits, comme l'épreuve réelle) */
+.qcm-tableau-wrap {
+  overflow-x: auto;
+}
+
+.qcm-tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.qcm-tableau th,
+.qcm-tableau td {
+  border: 1px solid var(--line);
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+}
+
+.qcm-tableau th {
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--graphite-soft);
+}
+
+.qcm-tableau tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.qcm-tableau tbody tr:hover {
+  background: var(--paper);
+}
+
+.qcm-tableau tbody tr.correct {
+  background: var(--brass-soft);
+}
+
+.qcm-tableau tbody tr.incorrect {
+  background: var(--signal-soft);
+}
+
+.qcm-tableau-lettre {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.resultat-final {
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
+/* ----------------------------------------------------------
    États chargement / erreur (aucun contenu de repli local)
    ---------------------------------------------------------- */
 

@@ -1,16 +1,21 @@
 /**
  * reponseCourteGenerator.ts — module "Résolution guidée" (Section B, ST)
  * ------------------------------------------------------------------
- * Même principe que qcmGenerator.ts : Gemini écrit la mise en
- * situation en direct à chaque appel, jamais les valeurs numériques
- * ni la réponse attendue.
+ * Comme l'épreuve réelle (questions 16 à 20) : une mise en situation,
+ * puis une batterie de sous-questions a/b, chacune notée à crédit
+ * partiel (voir engines/notationEngine.ts) — pas juste une seule
+ * valeur numérique bonne/mauvaise comme avant.
+ *
+ * Gemini écrit la mise en situation en direct à chaque appel, jamais
+ * les valeurs numériques ni les réponses attendues.
  * ------------------------------------------------------------------
  */
 
-import type { QuestionCourte } from "../types/question";
+import type { QuestionCourte, SousQuestionNumerique, SousQuestionChoixUnique, OptionChoix } from "../types/question";
 import {
   calculerEnergieJoules,
   joulesVersKilowattheures,
+  resoudrePuissance,
   type UniteTemps,
 } from "../engines/electriciteEngine";
 import { calculerConcentration } from "../engines/chimieEngine";
@@ -21,70 +26,121 @@ function idAleatoire(prefixe: string): string {
 }
 
 // ------------------------------------------------------------
-// Énergie électrique — E = P Δt, avec piège de conversion de temps
+// Énergie électrique — plaque signalétique : P = U I, puis E = P Δt
+// (comme la question 18 : calcul de la puissance, puis de l'énergie)
 // ------------------------------------------------------------
 
-async function genCourteEnergieElectrique(): Promise<QuestionCourte> {
-  const puissanceW = Math.floor(Math.random() * 15 + 5) * 100; // 500–2000 W
+async function genCourtePlaqueSignaletique(): Promise<QuestionCourte> {
+  const tensionV = Number((Math.random() * 100 + 12).toFixed(1)); // 12–112 V
+  const courantA = Number((Math.random() * 4 + 0.5).toFixed(1)); // 0.5–4.5 A
+  const { puissanceW } = resoudrePuissance({ tensionV, courantA });
+
   const unitesTemps: UniteTemps[] = ["min", "h"];
   const uniteTemps = unitesTemps[Math.floor(Math.random() * unitesTemps.length)];
   const duree =
-    uniteTemps === "min" ? Math.floor(Math.random() * 40 + 10) : Math.floor(Math.random() * 4 + 1);
+    uniteTemps === "min" ? Math.floor(Math.random() * 40 + 10) : Number((Math.random() * 3 + 0.5).toFixed(1));
 
   const energieJoules = calculerEnergieJoules(puissanceW, duree, uniteTemps);
   const energieKWh = joulesVersKilowattheures(energieJoules);
 
   const prompt = [
     "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
-    "pour une question de sciences de 4e secondaire sur la consommation d'énergie électrique.",
-    `L'appareil décrit doit avoir une puissance de EXACTEMENT ${puissanceW} watts et fonctionner pendant EXACTEMENT ${duree} ${uniteTemps === "min" ? "minutes" : "heures"}.`,
+    "pour une question de sciences de 4e secondaire sur la plaque signalétique d'un appareil électrique.",
+    `L'appareil décrit doit avoir EXACTEMENT ${tensionV} volts et EXACTEMENT ${courantA} ampères inscrits sur sa plaque signalétique,`,
+    `et être utilisé pendant EXACTEMENT ${duree} ${uniteTemps === "min" ? "minutes" : "heures"}.`,
     "Choisis un appareil électroménager ou électronique réaliste — varie ton choix à chaque fois.",
-    "N'effectue AUCUN calcul, ne mentionne aucune énergie consommée, ne révèle aucune réponse.",
+    "N'effectue AUCUN calcul, ne mentionne aucune puissance ni énergie, ne révèle aucune réponse.",
     'Réponds uniquement avec un JSON strict de la forme {"miseEnSituation": "..."}, sans aucun autre texte.',
   ].join("\n");
 
   const miseEnSituation = await demanderMiseEnSituation(prompt);
-  const enonce = `${miseEnSituation} Quelle quantité d'énergie, en kilowattheures (kWh), cet appareil a-t-il consommée ?`;
+
+  const sousQuestionPuissance: SousQuestionNumerique = {
+    id: "puissance",
+    typeReponse: "numerique",
+    demandeDemarche: true,
+    enonce: "Quelle est la puissance de cet appareil ?",
+    bareme: { pointsMax: 2 },
+    uniteAttendue: "W",
+    reponseAttendue: Number(puissanceW.toFixed(2)),
+    toleranceRelative: 0.02,
+    explication: `P = U × I = ${tensionV} × ${courantA} = ${puissanceW.toFixed(2)} W.`,
+  };
+
+  const sousQuestionEnergie: SousQuestionNumerique = {
+    id: "energie",
+    typeReponse: "numerique",
+    demandeDemarche: true,
+    enonce: `Quelle quantité d'énergie cet appareil a-t-il consommée pendant ${duree} ${uniteTemps === "min" ? "minutes" : "heures"} ?`,
+    bareme: { pointsMax: 2 },
+    uniteAttendue: "kWh",
+    reponseAttendue: Number(energieKWh.toFixed(3)),
+    toleranceRelative: 0.02,
+    explication: `Δt = ${duree} ${uniteTemps} converti en secondes, puis E = P × Δt = ${energieJoules.toFixed(0)} J, soit ${energieKWh.toFixed(3)} kWh après conversion (1 kWh = 3 600 000 J).`,
+  };
 
   return {
-    id: idAleatoire("courte-energie"),
+    id: idAleatoire("courte-plaque"),
     type: "courte",
     section: "B",
     univers: "materiel",
     conceptId: "st-um-puissance-energie",
-    enonce,
-    uniteAttendue: "kWh",
-    reponseAttendue: Number(energieKWh.toFixed(3)),
-    toleranceRelative: 0.02,
-    etapesDemarche: [
-      "Convertir la durée en secondes",
-      "Calculer E = P × Δt (résultat en joules)",
-      "Convertir le résultat de joules en kWh (1 kWh = 3 600 000 J)",
-    ],
-    explication: `Δt = ${duree} ${uniteTemps} converti en secondes, puis E = P × Δt = ${energieJoules.toFixed(0)} J, soit ${energieKWh.toFixed(3)} kWh après conversion.`,
+    enonce: miseEnSituation,
+    sousQuestions: [sousQuestionPuissance, sousQuestionEnergie],
   };
 }
 
 // ------------------------------------------------------------
-// Concentration — C = m / V
+// Concentration — C = m / V, puis recommandation selon un seuil
+// (comme la question 19 : calcul, puis choix motivé par le résultat)
 // ------------------------------------------------------------
 
-async function genCourteConcentration(): Promise<QuestionCourte> {
-  const masseGrammes = Math.floor(Math.random() * 40 + 10); // 10–49 g
-  const volumeLitres = Number((Math.random() * 1.5 + 0.5).toFixed(1)); // 0.5–2.0 L
+async function genCourteConcentrationRecommandation(): Promise<QuestionCourte> {
+  const masseGrammes = Math.floor(Math.random() * 190 + 10); // 10–199 g
+  const volumeLitres = Number((Math.random() * 4 + 1).toFixed(1)); // 1.0–5.0 L
   const concentration = calculerConcentration(masseGrammes, volumeLitres);
+
+  const SEUIL_BAS = 20;
+  const SEUIL_HAUT = 60;
+  const options: OptionChoix[] = [
+    { id: "faible", texte: `Concentration faible (moins de ${SEUIL_BAS} g/L) : ne rien ajouter.` },
+    { id: "moyenne", texte: `Concentration moyenne (entre ${SEUIL_BAS} et ${SEUIL_HAUT} g/L) : ajouter une petite quantité.` },
+    { id: "elevee", texte: `Concentration élevée (plus de ${SEUIL_HAUT} g/L) : diluer la solution.` },
+  ];
+  const bonneOptionId = concentration < SEUIL_BAS ? "faible" : concentration <= SEUIL_HAUT ? "moyenne" : "elevee";
 
   const prompt = [
     "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
-    "pour une question de sciences de 4e secondaire sur la préparation d'une solution.",
+    "pour une question de sciences de 4e secondaire sur l'analyse d'une solution.",
     `La situation doit impliquer EXACTEMENT ${masseGrammes} grammes de soluté dissous dans une solution de EXACTEMENT ${volumeLitres} litres.`,
-    "Choisis un contexte réaliste (laboratoire scolaire, cuisine, jardinage, piscine) — varie ton choix à chaque fois.",
+    "Choisis un contexte réaliste (laboratoire scolaire, agriculture, piscine, traitement de l'eau) — varie ton choix à chaque fois.",
     "N'effectue AUCUN calcul, ne mentionne aucune concentration, ne révèle aucune réponse.",
     'Réponds uniquement avec un JSON strict de la forme {"miseEnSituation": "..."}, sans aucun autre texte.',
   ].join("\n");
 
   const miseEnSituation = await demanderMiseEnSituation(prompt);
-  const enonce = `${miseEnSituation} Quelle est la concentration de cette solution, en g/L ?`;
+
+  const sousQuestionConcentration: SousQuestionNumerique = {
+    id: "concentration",
+    typeReponse: "numerique",
+    demandeDemarche: true,
+    enonce: "Quelle est la concentration de cette solution ?",
+    bareme: { pointsMax: 3 },
+    uniteAttendue: "g/L",
+    reponseAttendue: Number(concentration.toFixed(2)),
+    toleranceRelative: 0.02,
+    explication: `C = m / V = ${masseGrammes} / ${volumeLitres} = ${concentration.toFixed(2)} g/L.`,
+  };
+
+  const sousQuestionRecommandation: SousQuestionChoixUnique = {
+    id: "recommandation",
+    typeReponse: "choix-unique",
+    enonce: "Selon cette concentration, quelle recommandation devrait être faite ?",
+    bareme: { pointsMax: 1 },
+    options,
+    bonneOptionId,
+    explication: `Avec une concentration de ${concentration.toFixed(2)} g/L, la recommandation appropriée est : ${options.find((o) => o.id === bonneOptionId)!.texte}`,
+  };
 
   return {
     id: idAleatoire("courte-concentration"),
@@ -92,15 +148,8 @@ async function genCourteConcentration(): Promise<QuestionCourte> {
     section: "B",
     univers: "materiel",
     conceptId: "st-um-concentration",
-    enonce,
-    uniteAttendue: "g/L",
-    reponseAttendue: Number(concentration.toFixed(2)),
-    toleranceRelative: 0.02,
-    etapesDemarche: [
-      "Identifier la masse de soluté (m) et le volume de solution (V)",
-      "Calculer C = m / V",
-    ],
-    explication: `C = m / V = ${masseGrammes} / ${volumeLitres} = ${concentration.toFixed(2)} g/L.`,
+    enonce: miseEnSituation,
+    sousQuestions: [sousQuestionConcentration, sousQuestionRecommandation],
   };
 }
 
@@ -108,7 +157,7 @@ async function genCourteConcentration(): Promise<QuestionCourte> {
 // Sélecteur
 // ------------------------------------------------------------
 
-const GENERATEURS_DISPONIBLES = [genCourteEnergieElectrique, genCourteConcentration];
+const GENERATEURS_DISPONIBLES = [genCourtePlaqueSignaletique, genCourteConcentrationRecommandation];
 
 export async function genererQuestionCourte(): Promise<QuestionCourte> {
   const generateur =

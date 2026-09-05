@@ -1,6 +1,13 @@
 /**
  * analyseGenerator.ts — module "Analyse technique" (Section C, ST)
  * ------------------------------------------------------------------
+ * Comme l'épreuve réelle (questions 21 à 25) : UN SEUL objet
+ * technique, avec sa fonction globale, ses composants MÉCANIQUES et
+ * ÉLECTRIQUES analysés ensemble, et une batterie de sous-questions de
+ * types variés (choix unique, mots de banque, texte libre), chacune
+ * notée à crédit partiel — pas juste des questions à révéler sans
+ * notation comme avant.
+ *
  * Un objet technique = DEUX mécanismes qui interagissent, comme un
  * vrai objet réel (ex. une perceuse : un réducteur qui transmet la
  * rotation du moteur, puis un mandrin qui la transforme en action de
@@ -18,12 +25,21 @@
  *   - la nature de l'interaction entre les deux mécanismes (rotation
  *     → rotation → translation est structurellement garanti par la
  *     construction, jamais une invention de Gemini) ;
- *   - les caractéristiques de la liaison et du matériau (tables de
- *     référence vérifiées, comme avant).
+ *   - les caractéristiques de la liaison, du matériau et les fonctions
+ *     électriques des composants (tables de référence vérifiées,
+ *     comme avant).
  * ------------------------------------------------------------------
  */
 
-import type { QuestionAnalyse, SousQuestionAnalyse } from "../types/question";
+import type {
+  QuestionAnalyse,
+  SousQuestionNotee,
+  SousQuestionChoixUnique,
+  SousQuestionNumerique,
+  SousQuestionMotsBanque,
+  SousQuestionTexteLibre,
+  OptionChoix,
+} from "../types/question";
 import type { DonneesMecanisme } from "../types/mecanisme3D";
 import {
   genererTrainAleatoire,
@@ -39,13 +55,24 @@ import {
   calculerCourseCame,
   calculerCourseManivelle,
 } from "../engines/transformationEngine";
-import { choisirLiaisonAleatoire } from "../engines/liaisonsEngine";
+import { choisirLiaisonAleatoire, type Liaison } from "../engines/liaisonsEngine";
 import { choisirMateriauAleatoire } from "../engines/materiauxEngine";
+import { construireCircuitSimple, LIBELLE_FONCTION_ELECTRIQUE } from "../engines/circuitEngine";
 import { demanderObjetCompose, demanderContexteApplication } from "../ai/geminiClient";
 import { choisirObjetAssembleAleatoire } from "../data/objetsAssembles";
+import type { CircuitElectrique } from "../types/question";
 
 function idAleatoire(prefixe: string): string {
   return `${prefixe}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function melanger<T>(items: T[]): T[] {
+  const copie = [...items];
+  for (let i = copie.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copie[i], copie[j]] = [copie[j], copie[i]];
+  }
+  return copie;
 }
 
 function randInt(min: number, max: number): number {
@@ -67,6 +94,22 @@ function capitaliser(s: string): string {
 }
 
 const sensTexte = (s: 1 | -1) => (s === 1 ? "horaire" : "antihoraire");
+
+function choixSensRotation(id: string, enonce: string, bonSens: SensRotation, pointsMax = 1): SousQuestionChoixUnique {
+  const options: OptionChoix[] = [
+    { id: "horaire", texte: "Horaire" },
+    { id: "antihoraire", texte: "Antihoraire" },
+  ];
+  return {
+    id,
+    typeReponse: "choix-unique",
+    enonce,
+    bareme: { pointsMax },
+    options,
+    bonneOptionId: bonSens,
+    explication: `Le sens de rotation correct est : ${bonSens}.`,
+  };
+}
 
 // ============================================================
 // Les 9 mécanismes, répartis en deux familles
@@ -124,7 +167,7 @@ const CONCEPT_ID_PAR_MECANISME: Record<CleMecanisme, string> = {
 
 interface ConstructionMecanisme {
   phraseTechnique: string;
-  sousQuestions: SousQuestionAnalyse[];
+  sousQuestions: SousQuestionNotee[];
   mecanisme3D: DonneesMecanisme;
 }
 
@@ -147,26 +190,31 @@ function construireTrainEngrenages(): ConstructionMecanisme {
     `Ce mécanisme comprend ${noms.length} roues dentées en prise directe, ` +
     `dans l'ordre suivant : ${noms.join(", ")}. La roue ${train.engrenages[0].id} tourne dans le sens ${train.sensRotationEntree}.`;
 
-  const sousQuestions: SousQuestionAnalyse[] = [
-    {
-      id: "m1-sens-rotation",
-      enonce: `Dans quel sens tourne la roue ${train.engrenages[dernierIndex].id} ?`,
-      reponseAttendue: sens[dernierIndex],
-      explication:
-        train.engrenages.length === 2
-          ? `Deux roues en prise directe tournent toujours en sens opposés : la roue ${train.engrenages[dernierIndex].id} tourne donc en sens ${sens[dernierIndex]}.`
-          : `Chaque engrènement direct inverse le sens de rotation. Après ${dernierIndex} engrènements, la roue ${train.engrenages[dernierIndex].id} tourne en sens ${sens[dernierIndex]}.`,
-    },
+  const optionsRoues: OptionChoix[] = train.engrenages.map((e) => ({ id: e.id, texte: `Roue ${e.id}` }));
+
+  const sousQuestions: SousQuestionNotee[] = [
+    choixSensRotation(
+      "m1-sens-rotation",
+      `Dans quel sens tourne la roue ${train.engrenages[dernierIndex].id} ?`,
+      sens[dernierIndex]
+    ),
     {
       id: "m1-rapport-vitesse",
+      typeReponse: "numerique",
+      demandeDemarche: false,
       enonce: `Quel est le rapport de vitesse entre la roue ${train.engrenages[0].id} (entrée) et la roue ${train.engrenages[dernierIndex].id} (sortie) ?`,
-      reponseAttendue: rapport.toFixed(2),
+      bareme: { pointsMax: 1 },
+      reponseAttendue: Number(rapport.toFixed(2)),
+      toleranceRelative: 0.02,
       explication: `Rapport de vitesse = dents(entrée) / dents(sortie) = ${train.engrenages[0].nombreDents} / ${train.engrenages[dernierIndex].nombreDents} = ${rapport.toFixed(2)}.`,
-    },
+    } as SousQuestionNumerique,
     {
       id: "m1-roue-plus-rapide",
+      typeReponse: "choix-unique",
       enonce: "Laquelle des roues de ce mécanisme tourne le plus vite ?",
-      reponseAttendue: `Roue ${plusRapide.id}`,
+      bareme: { pointsMax: 1 },
+      options: optionsRoues,
+      bonneOptionId: plusRapide.id,
       explication: `La roue ayant le moins de dents (roue ${plusRapide.id}, ${plusRapide.nombreDents} dents) tourne toujours le plus vite dans un train en prise directe.`,
     },
   ];
@@ -197,18 +245,17 @@ function construireRouesFriction(): ConstructionMecanisme {
   return {
     phraseTechnique: `Ce mécanisme comprend deux roues de friction (cylindres lisses) en contact direct, notées A (${rayonA} cm de rayon) et B (${rayonB} cm de rayon).`,
     sousQuestions: [
-      {
-        id: "m1-sens-sortie",
-        enonce: "Dans quel sens tourne la roue B ?",
-        reponseAttendue: sensTexte(resultat.sensSortie),
-        explication: `Deux roues de friction en contact tournent toujours en sens opposés : A tourne en sens ${sensTexte(sensA)}, donc B tourne en sens ${sensTexte(resultat.sensSortie)}.`,
-      },
+      choixSensRotation("m1-sens-sortie", "Dans quel sens tourne la roue B ?", sensTexte(resultat.sensSortie)),
       {
         id: "m1-rapport-vitesse",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `La roue A a un rayon de ${rayonA} cm et la roue B un rayon de ${rayonB} cm. Quel est le rapport de vitesse entre A et B ?`,
-        reponseAttendue: resultat.rapportVitesse.toFixed(2),
+        bareme: { pointsMax: 1 },
+        reponseAttendue: Number(resultat.rapportVitesse.toFixed(2)),
+        toleranceRelative: 0.02,
         explication: `Rapport de vitesse = rayon(A) / rayon(B) = ${rayonA} / ${rayonB} = ${resultat.rapportVitesse.toFixed(2)}.`,
-      },
+      } as SousQuestionNumerique,
     ],
     mecanisme3D: {
       type: "transmissionSimple",
@@ -230,18 +277,17 @@ function construirePoulieCourroie(): ConstructionMecanisme {
   return {
     phraseTechnique: `Ce mécanisme comprend deux poulies reliées par une courroie, notées A (${rayonA} cm de rayon) et B (${rayonB} cm de rayon).`,
     sousQuestions: [
-      {
-        id: "m1-sens-sortie",
-        enonce: "Dans quel sens tourne la poulie B ?",
-        reponseAttendue: sensTexte(resultat.sensSortie),
-        explication: `Une courroie relie les deux poulies dans le MÊME sens de rotation : A tourne en sens ${sensTexte(sensA)}, donc B tourne aussi en sens ${sensTexte(resultat.sensSortie)}.`,
-      },
+      choixSensRotation("m1-sens-sortie", "Dans quel sens tourne la poulie B ?", sensTexte(resultat.sensSortie)),
       {
         id: "m1-rapport-vitesse",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `La poulie A a un rayon de ${rayonA} cm et la poulie B un rayon de ${rayonB} cm. Quel est le rapport de vitesse entre A et B ?`,
-        reponseAttendue: resultat.rapportVitesse.toFixed(2),
+        bareme: { pointsMax: 1 },
+        reponseAttendue: Number(resultat.rapportVitesse.toFixed(2)),
+        toleranceRelative: 0.02,
         explication: `Rapport de vitesse = rayon(A) / rayon(B) = ${rayonA} / ${rayonB} = ${resultat.rapportVitesse.toFixed(2)}.`,
-      },
+      } as SousQuestionNumerique,
     ],
     mecanisme3D: {
       type: "transmissionSimple",
@@ -263,18 +309,17 @@ function construireRoueChaine(): ConstructionMecanisme {
   return {
     phraseTechnique: `Ce mécanisme comprend deux roues dentées reliées par une chaîne, notées A (${dentsA} dents) et B (${dentsB} dents).`,
     sousQuestions: [
-      {
-        id: "m1-sens-sortie",
-        enonce: "Dans quel sens tourne la roue B ?",
-        reponseAttendue: sensTexte(resultat.sensSortie),
-        explication: `Une chaîne relie les deux roues dans le MÊME sens de rotation (comme une courroie) : A tourne en sens ${sensTexte(sensA)}, donc B tourne aussi en sens ${sensTexte(resultat.sensSortie)}.`,
-      },
+      choixSensRotation("m1-sens-sortie", "Dans quel sens tourne la roue B ?", sensTexte(resultat.sensSortie)),
       {
         id: "m1-rapport-vitesse",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `La roue A compte ${dentsA} dents et la roue B compte ${dentsB} dents. Quel est le rapport de vitesse entre A et B ?`,
-        reponseAttendue: resultat.rapportVitesse.toFixed(2),
+        bareme: { pointsMax: 1 },
+        reponseAttendue: Number(resultat.rapportVitesse.toFixed(2)),
+        toleranceRelative: 0.02,
         explication: `Rapport de vitesse = dents(A) / dents(B) = ${dentsA} / ${dentsB} = ${resultat.rapportVitesse.toFixed(2)}.`,
-      },
+      } as SousQuestionNumerique,
     ],
     mecanisme3D: {
       type: "transmissionSimple",
@@ -298,14 +343,25 @@ function construireVisSansFin(): ConstructionMecanisme {
     sousQuestions: [
       {
         id: "m1-rapport-reduction",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `Cette roue compte ${dentsRoue} dents et la vis a un seul filet. Combien de tours de vis faut-il pour faire faire un tour complet à la roue ?`,
-        reponseAttendue: `${resultat.rapportReduction.toFixed(0)} tours`,
+        bareme: { pointsMax: 1 },
+        uniteAttendue: "tours",
+        reponseAttendue: resultat.rapportReduction,
+        toleranceRelative: 0.02,
         explication: `Chaque tour de vis avance la roue d'une seule dent (1 filet). Il faut donc ${dentsRoue} tours de vis pour un tour complet de la roue à ${dentsRoue} dents.`,
-      },
+      } as SousQuestionNumerique,
       {
         id: "m1-reversibilite",
+        typeReponse: "choix-unique",
         enonce: "Peut-on faire tourner la vis en entraînant la roue (mécanisme réversible) ?",
-        reponseAttendue: "Non",
+        bareme: { pointsMax: 1 },
+        options: [
+          { id: "oui", texte: "Oui" },
+          { id: "non", texte: "Non" },
+        ],
+        bonneOptionId: "non",
         explication: "Le système roue et vis sans fin est auto-bloquant : impossible d'entraîner la vis à partir de la roue.",
       },
     ],
@@ -325,10 +381,15 @@ function construirePignonCremaillere(): ConstructionMecanisme {
     sousQuestions: [
       {
         id: "m2-vitesse-lineaire",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `Le pignon a un rayon de ${rayonPignon} cm et tourne à une vitesse angulaire de ${vitesseAngulaire} rad/s. Quelle est la vitesse linéaire de la crémaillère ?`,
-        reponseAttendue: `${resultat.vitesseLineaire.toFixed(2)} cm/s`,
+        bareme: { pointsMax: 1 },
+        uniteAttendue: "cm/s",
+        reponseAttendue: Number(resultat.vitesseLineaire.toFixed(2)),
+        toleranceRelative: 0.02,
         explication: `v = ω × r = ${vitesseAngulaire} × ${rayonPignon} = ${resultat.vitesseLineaire.toFixed(2)} cm/s.`,
-      },
+      } as SousQuestionNumerique,
     ],
     mecanisme3D: {
       type: "pignonCremaillere",
@@ -347,14 +408,25 @@ function construireVisEcrou(): ConstructionMecanisme {
     sousQuestions: [
       {
         id: "m2-deplacement",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `Cette vis a un pas de ${pasMm} mm. Quel est le déplacement de l'écrou après ${nombreTours} tours complets ?`,
-        reponseAttendue: `${resultat.deplacementMm} mm`,
+        bareme: { pointsMax: 1 },
+        uniteAttendue: "mm",
+        reponseAttendue: resultat.deplacementMm,
+        toleranceRelative: 0.02,
         explication: `Déplacement = pas × nombre de tours = ${pasMm} × ${nombreTours} = ${resultat.deplacementMm} mm.`,
-      },
+      } as SousQuestionNumerique,
       {
         id: "m2-reversibilite",
+        typeReponse: "choix-unique",
         enonce: "Ce mécanisme est-il réversible ?",
-        reponseAttendue: "Généralement non",
+        bareme: { pointsMax: 1 },
+        options: [
+          { id: "oui", texte: "Oui" },
+          { id: "non", texte: "Non, généralement auto-bloquant" },
+        ],
+        bonneOptionId: "non",
         explication: "Un filet standard est généralement auto-bloquant par friction : pousser l'écrou ne fait pas tourner la vis.",
       },
     ],
@@ -372,10 +444,15 @@ function construireCame(): ConstructionMecanisme {
     sousQuestions: [
       {
         id: "m2-course",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `Cette came a une excentricité de ${excentricite} cm. Quelle est la course totale (déplacement maximal) du poussoir ?`,
-        reponseAttendue: `${course.toFixed(1)} cm`,
+        bareme: { pointsMax: 1 },
+        uniteAttendue: "cm",
+        reponseAttendue: Number(course.toFixed(1)),
+        toleranceRelative: 0.03,
         explication: `Pour une came circulaire excentrique, la course = 2 × excentricité = 2 × ${excentricite} = ${course.toFixed(1)} cm.`,
-      },
+      } as SousQuestionNumerique,
     ],
     mecanisme3D: {
       type: "came",
@@ -398,16 +475,28 @@ function construireBielleManivelle(): ConstructionMecanisme {
     sousQuestions: [
       {
         id: "m2-type-mouvement",
+        typeReponse: "choix-unique",
         enonce: "Quel type de mouvement ce mécanisme produit-il au niveau du piston ?",
-        reponseAttendue: "Rectiligne alternatif (va-et-vient)",
+        bareme: { pointsMax: 1 },
+        options: [
+          { id: "rectiligne-alternatif", texte: "Rectiligne alternatif (va-et-vient)" },
+          { id: "rotation-continue", texte: "Rotation continue" },
+          { id: "rectiligne-uniforme", texte: "Rectiligne uniforme (une seule direction)" },
+        ],
+        bonneOptionId: "rectiligne-alternatif",
         explication: "La bielle transforme le mouvement circulaire de la manivelle en un mouvement rectiligne alternatif du piston.",
       },
       {
         id: "m2-course",
+        typeReponse: "numerique",
+        demandeDemarche: false,
         enonce: `La manivelle a un rayon de ${rayonManivelle} cm. Quelle est la course totale du piston ?`,
-        reponseAttendue: `${course.toFixed(1)} cm`,
+        bareme: { pointsMax: 1 },
+        uniteAttendue: "cm",
+        reponseAttendue: Number(course.toFixed(1)),
+        toleranceRelative: 0.03,
         explication: `Course = 2 × rayon de la manivelle = 2 × ${rayonManivelle} = ${course.toFixed(1)} cm.`,
-      },
+      } as SousQuestionNumerique,
     ],
     mecanisme3D: {
       type: "bielleManivelle",
@@ -433,6 +522,33 @@ const CONSTRUCTEURS: Record<CleMecanisme, () => ConstructionMecanisme> = {
 };
 
 // ============================================================
+// Circuit électrique de l'objet — table de référence vérifiée
+// (voir engines/circuitEngine.ts), jamais inventée par Gemini.
+// ============================================================
+
+function construireSousQuestionsCircuit(circuit: CircuitElectrique): SousQuestionNotee[] {
+  const composantsInterroges = melanger([...circuit.composants]).slice(0, 2);
+
+  return composantsInterroges.map((composant, i) => {
+    const bonneReponse = LIBELLE_FONCTION_ELECTRIQUE[composant.fonctionElectrique];
+    const distracteurs = melanger(
+      Object.values(LIBELLE_FONCTION_ELECTRIQUE).filter((f) => f !== bonneReponse)
+    ).slice(0, 3);
+    const banqueMots = melanger([bonneReponse, ...distracteurs]);
+
+    return {
+      id: `circuit-fonction-${i}`,
+      typeReponse: "mots-banque",
+      enonce: `Dans ce circuit, quelle est la fonction électrique du composant « ${composant.nom} » ?`,
+      bareme: { pointsMax: 1 },
+      banqueMots,
+      emplacements: [{ id: "fonction", libelle: composant.nom, motAttendu: bonneReponse }],
+      explication: `Le ${composant.nom} assure la fonction « ${bonneReponse} » dans ce circuit.`,
+    } as SousQuestionMotsBanque;
+  });
+}
+
+// ============================================================
 // Orchestrateur — un seul appel Gemini invente l'objet complet
 // ============================================================
 
@@ -449,6 +565,8 @@ async function genererObjetCompose(
     `- Mécanisme 1 : ${LIBELLE_ROLE_MECANISME[cle1]}`,
     `- Mécanisme 2 : ${LIBELLE_ROLE_MECANISME[cle2]}`,
     "Le mécanisme 1 doit entraîner le mécanisme 2 (la sortie du premier alimente l'entrée du second).",
+    "L'objet doit être alimenté par un moteur électrique qui entraîne le mécanisme 1 (jamais manuel) :",
+    "l'objet comporte donc aussi un circuit électrique simple (pile, interrupteur, moteur).",
     "Sois très créatif et varié dans ton choix d'objet à CHAQUE appel : évite de toujours proposer les",
     "exemples les plus évidents (vélo, perceuse) — explore des objets réels moins attendus (électroménagers,",
     "outils, jouets mécaniques, équipement de sport ou de camping, machines agricoles, appareils de bureau,",
@@ -457,10 +575,62 @@ async function genererObjetCompose(
     "Ne mentionne AUCUNE valeur numérique, aucun calcul, aucune caractéristique technique précise",
     "(dimensions, vitesses, nombre de dents) — ça sera traité séparément.",
     "Réponds uniquement avec un JSON strict de cette forme, sans aucun autre texte :",
-    '{"nomObjet": "...", "descriptionGenerale": "...", "descriptionMecanisme1": "...", "descriptionMecanisme2": "...", "piecePourLiaison": "...", "piecePourMateriau": "..."}',
+    '{"nomObjet": "...", "fonctionGlobale": "...", "descriptionGenerale": "...", "descriptionMecanisme1": "...", "descriptionMecanisme2": "...", "piecePourLiaison": "...", "piecePourMateriau": "..."}',
   ].join("\n");
 
   return demanderObjetCompose(prompt);
+}
+
+function construireSousQuestionInteraction(): SousQuestionTexteLibre {
+  return {
+    id: "interaction",
+    typeReponse: "texte-libre",
+    enonce: "Comment le mouvement produit par le premier mécanisme est-il utilisé par le second ?",
+    bareme: { pointsMax: 2 },
+    criteresCorrection: [
+      "la sortie du premier mécanisme (rotation) devient l'entrée du second",
+      "le second mécanisme transforme cette rotation en un mouvement de translation (ou de va-et-vient)",
+    ],
+    reponseModele:
+      "La rotation produite par le premier mécanisme entraîne directement le second, qui la transforme en un mouvement de translation.",
+    explication:
+      "Un système de transmission (comme le premier mécanisme) conserve un mouvement de rotation, à une vitesse ou dans un sens différent. Un système de transformation (comme le second) prend cette rotation en entrée et la convertit en un déplacement en ligne droite ou en va-et-vient. La sortie du premier mécanisme devient donc directement l'entrée du second.",
+  };
+}
+
+function construireSousQuestionLiaison(piece: string, liaison: Liaison): SousQuestionMotsBanque {
+  return {
+    id: "liaison",
+    typeReponse: "mots-banque",
+    enonce: `${capitaliser(piece)} est assemblé(e) par ${liaison.nom}. Complète les deux caractéristiques de cette liaison.`,
+    bareme: { pointsMax: 2 },
+    banqueMots: ["démontable", "indémontable", "rigide", "élastique"],
+    emplacements: [
+      {
+        id: "montage",
+        libelle: "Cette liaison est",
+        motAttendu: liaison.caracteristiques.demontable ? "démontable" : "indémontable",
+      },
+      {
+        id: "rigidite",
+        libelle: "et elle est",
+        motAttendu: liaison.caracteristiques.rigide ? "rigide" : "élastique",
+      },
+    ],
+    explication: liaison.justification,
+  };
+}
+
+function construireSousQuestionMateriau(piece: string, materiauNom: string, proprieteCle: string): SousQuestionTexteLibre {
+  return {
+    id: "materiau",
+    typeReponse: "texte-libre",
+    enonce: `${capitaliser(piece)} de cet objet est fabriqué(e) en ${materiauNom}. Nomme une propriété de ce matériau qui justifie ce choix.`,
+    bareme: { pointsMax: 1 },
+    criteresCorrection: [proprieteCle],
+    reponseModele: proprieteCle,
+    explication: `Propriété clé de ce matériau : ${proprieteCle}.`,
+  };
 }
 
 export async function genererQuestionAnalyseComposee(): Promise<QuestionAnalyse> {
@@ -472,31 +642,9 @@ export async function genererQuestionAnalyseComposee(): Promise<QuestionAnalyse>
 
   const liaison = choisirLiaisonAleatoire();
   const materiau = choisirMateriauAleatoire();
+  const circuit = construireCircuitSimple({ sortie: "moteur", avecFusible: Math.random() < 0.4 });
 
   const objet = await genererObjetCompose(cle1, cle2, liaison.nom, materiau.nom);
-
-  const sousQuestionInteraction: SousQuestionAnalyse = {
-    id: "interaction",
-    enonce: "Comment le mouvement produit par le premier mécanisme est-il utilisé par le second ?",
-    reponseAttendue:
-      "La rotation produite par le premier mécanisme entraîne directement le second, qui la transforme en un mouvement de translation.",
-    explication:
-      "Un système de transmission (comme le premier mécanisme) conserve un mouvement de rotation, à une vitesse ou dans un sens différent. Un système de transformation (comme le second) prend cette rotation en entrée et la convertit en un déplacement en ligne droite ou en va-et-vient. La sortie du premier mécanisme devient donc directement l'entrée du second.",
-  };
-
-  const sousQuestionLiaison: SousQuestionAnalyse = {
-    id: "liaison",
-    enonce: `${capitaliser(objet.piecePourLiaison)} est assemblé(e) par ${liaison.nom}. Cette liaison est-elle démontable ou indémontable ? Rigide ou élastique ?`,
-    reponseAttendue: `${liaison.caracteristiques.demontable ? "Démontable" : "Indémontable"}, ${liaison.caracteristiques.rigide ? "rigide" : "élastique"}`,
-    explication: liaison.justification,
-  };
-
-  const sousQuestionMateriau: SousQuestionAnalyse = {
-    id: "materiau",
-    enonce: `${capitaliser(objet.piecePourMateriau)} de cet objet est fabriqué(e) en ${materiau.nom}. Nomme une propriété de ce matériau qui justifie ce choix.`,
-    reponseAttendue: materiau.proprietesCles[0],
-    explication: `Propriétés de ce matériau : ${materiau.proprietesCles.join(", ")}. Utilisation typique : ${materiau.exempleUsage}.`,
-  };
 
   const descriptionObjet = [
     `${capitaliser(objet.nomObjet)}.`,
@@ -514,16 +662,19 @@ export async function genererQuestionAnalyseComposee(): Promise<QuestionAnalyse>
     // transformation (mécanisme 2) ; on tague ici sur le premier, faute
     // d'un modèle à concepts multiples pour l'instant.
     conceptId: CONCEPT_ID_PAR_MECANISME[cle1],
-    enonce: "Analyse l'objet technique suivant : décris chacun de ses mécanismes et explique comment ils interagissent.",
+    enonce: "Analyse l'objet technique suivant : décris ses composants mécaniques et électriques et explique comment ils interagissent.",
+    fonctionGlobale: objet.fonctionGlobale,
     descriptionObjet,
     sousQuestions: [
       ...construction1.sousQuestions,
       ...construction2.sousQuestions,
-      sousQuestionInteraction,
-      sousQuestionLiaison,
-      sousQuestionMateriau,
+      construireSousQuestionInteraction(),
+      construireSousQuestionLiaison(objet.piecePourLiaison, liaison),
+      construireSousQuestionMateriau(objet.piecePourMateriau, materiau.nom, materiau.proprietesCles[0]),
+      ...construireSousQuestionsCircuit(circuit),
     ],
     mecanismes3D: [construction1.mecanisme3D, construction2.mecanisme3D],
+    circuitElectrique: circuit,
   };
 }
 
@@ -554,6 +705,8 @@ async function genAnalyseAssemblage(): Promise<QuestionAnalyse> {
   const objet = choisirObjetAssembleAleatoire();
   const contexte = await genererMiseEnSituationAssemblage(objet.nom);
 
+  const sousQuestionsCircuit = objet.circuitElectrique ? construireSousQuestionsCircuit(objet.circuitElectrique) : [];
+
   return {
     id: idAleatoire("analyse-assemblage"),
     type: "analyse",
@@ -561,9 +714,11 @@ async function genAnalyseAssemblage(): Promise<QuestionAnalyse> {
     univers: "technologique",
     conceptId: "st-ut-transmission",
     enonce: "Analyse l'objet technique suivant : inspecte chaque étage du mécanisme et réponds aux questions.",
+    fonctionGlobale: objet.fonctionGlobale,
     descriptionObjet: `${capitaliser(objet.nom)}. ${contexte}`,
-    sousQuestions: objet.questions,
+    sousQuestions: [...objet.questions, ...sousQuestionsCircuit],
     assemblage: { objectId: objet.id, etapes: objet.etapes },
+    circuitElectrique: objet.circuitElectrique,
   };
 }
 

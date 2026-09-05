@@ -4,27 +4,54 @@ import { useGenerationQuestion } from "../../hooks/useGenerationQuestion";
 import { EtatChargement, EtatErreur } from "../EtatsAsynchrones";
 import MecanismeViewer, { LegendeMecanisme } from "../SimulateurTechnologique/MecanismeViewer";
 import PoteauCompletViewer from "../SimulateurTechnologique/PoteauCompletViewer";
+import CircuitViewer from "../SimulateurTechnologique/CircuitViewer";
 import AssemblagePanel from "./AssemblagePanel";
+import SousQuestionBloc from "../SousQuestionBloc";
+import type { ResultatSousQuestion } from "../../types/question";
 
 interface PartieCProps {
   onRetour: () => void;
 }
 
+function TitreSousSection({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontSize: "0.72rem",
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "var(--graphite-soft)",
+        marginBottom: "0.5rem",
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
 export default function PartieC({ onRetour }: PartieCProps) {
   const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionAnalyse);
-  const [revelees, setRevelees] = useState<Set<string>>(new Set());
+  const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
+  const [pointsTotal, setPointsTotal] = useState(0);
+  const [pointsMaxTotal, setPointsMaxTotal] = useState(0);
 
-  function revelerToutes() {
-    if (!question) return;
-    setRevelees(new Set(question.sousQuestions.map((sq) => sq.id)));
+  function noterSousQuestion(r: ResultatSousQuestion) {
+    setResultats((prev) => ({ ...prev, [r.sousQuestionId]: r }));
   }
+
+  const toutesNotees = question ? question.sousQuestions.every((sq) => resultats[sq.id]) : false;
 
   function nouvelleAnalyse() {
-    setRevelees(new Set());
+    if (question && toutesNotees) {
+      const gagnes = question.sousQuestions.reduce((s, sq) => s + (resultats[sq.id]?.points ?? 0), 0);
+      const max = question.sousQuestions.reduce((s, sq) => s + sq.bareme.pointsMax, 0);
+      setPointsTotal((p) => p + gagnes);
+      setPointsMaxTotal((m) => m + max);
+    }
+    setResultats({});
     regenerer();
   }
-
-  const touteReveleeDeja = question ? revelees.size === question.sousQuestions.length : false;
 
   return (
     <div className="panel">
@@ -32,6 +59,11 @@ export default function PartieC({ onRetour }: PartieCProps) {
         <button className="retour-lien" onClick={onRetour} type="button">
           ← Modules
         </button>
+        {pointsMaxTotal > 0 && (
+          <span className="compteur">
+            {pointsTotal}/{pointsMaxTotal} points
+          </span>
+        )}
       </div>
 
       <span className="eyebrow-label">Analyse technique</span>
@@ -44,24 +76,22 @@ export default function PartieC({ onRetour }: PartieCProps) {
 
         {question && !chargement && !erreur && (
           <>
+            {question.fonctionGlobale && (
+              <div className="fonction-globale-encadre">
+                <span className="eyebrow-label" style={{ marginBottom: "0.2rem" }}>
+                  Fonction globale
+                </span>
+                {question.fonctionGlobale}
+              </div>
+            )}
+
             <div className="objet-technique">{question.descriptionObjet}</div>
 
             {question.assemblage && <AssemblagePanel assemblage={question.assemblage} />}
 
             {question.mecanismes3D && question.mecanismes3D.length === 2 && (
               <div style={{ marginTop: "1.25rem" }}>
-                <p
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.72rem",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--graphite-soft)",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Vue d'ensemble
-                </p>
+                <TitreSousSection>Vue d'ensemble</TitreSousSection>
                 <PoteauCompletViewer
                   mecanisme1={question.mecanismes3D[0]}
                   mecanisme2={question.mecanismes3D[1]}
@@ -72,61 +102,32 @@ export default function PartieC({ onRetour }: PartieCProps) {
 
             {question.mecanismes3D?.map((mecanisme, i) => (
               <div key={i} style={{ marginTop: "1.25rem" }}>
-                <p
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.72rem",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--graphite-soft)",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Mécanisme {i + 1}
-                </p>
+                <TitreSousSection>Mécanisme {i + 1}</TitreSousSection>
                 <MecanismeViewer mecanisme={mecanisme} height={280} />
                 <LegendeMecanisme mecanisme={mecanisme} />
               </div>
             ))}
 
+            {question.circuitElectrique && (
+              <div style={{ marginTop: "1.25rem" }}>
+                <TitreSousSection>Circuit électrique</TitreSousSection>
+                <CircuitViewer circuit={question.circuitElectrique} />
+              </div>
+            )}
+
             <div style={{ marginTop: "1.5rem" }}>
-              {question.sousQuestions.map((sq) => {
-                const revele = revelees.has(sq.id);
-                return (
-                  <div className="sous-question" key={sq.id}>
-                    <p className="enonce">{sq.enonce}</p>
-                    {!revele ? (
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => setRevelees((prev) => new Set(prev).add(sq.id))}
-                      >
-                        Voir la réponse
-                      </button>
-                    ) : (
-                      <div className="explication">
-                        <strong>Réponse : {sq.reponseAttendue}.</strong> {sq.explication}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {question.sousQuestions.map((sq) => (
+                <SousQuestionBloc key={sq.id} sousQuestion={sq} onNote={noterSousQuestion} />
+              ))}
             </div>
           </>
         )}
       </div>
 
-      {question && !chargement && !erreur && (
-        <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem" }}>
-          {!touteReveleeDeja && (
-            <button type="button" className="ghost" onClick={revelerToutes}>
-              Tout révéler
-            </button>
-          )}
-          <button type="button" className="primary" style={{ marginTop: 0 }} onClick={nouvelleAnalyse}>
-            Nouvel objet technique
-          </button>
-        </div>
+      {question && toutesNotees && !chargement && !erreur && (
+        <button type="button" className="primary" style={{ marginTop: "1.25rem" }} onClick={nouvelleAnalyse}>
+          Nouvel objet technique
+        </button>
       )}
     </div>
   );

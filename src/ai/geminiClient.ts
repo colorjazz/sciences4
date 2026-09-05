@@ -123,6 +123,7 @@ export async function demanderContexteApplication(prompt: string): Promise<strin
  */
 export interface DescriptionObjetCompose {
   nomObjet: string;
+  fonctionGlobale: string;
   descriptionGenerale: string;
   descriptionMecanisme1: string;
   descriptionMecanisme2: string;
@@ -132,6 +133,7 @@ export interface DescriptionObjetCompose {
 
 const CHAMPS_OBJET_COMPOSE: (keyof DescriptionObjetCompose)[] = [
   "nomObjet",
+  "fonctionGlobale",
   "descriptionGenerale",
   "descriptionMecanisme1",
   "descriptionMecanisme2",
@@ -154,4 +156,92 @@ export async function demanderObjetCompose(prompt: string): Promise<DescriptionO
   }
 
   return resultat as DescriptionObjetCompose;
+}
+
+/**
+ * Demande à Gemini un LOT de mises en situation en un seul appel réseau
+ * (une par scénario déjà déterminé par les moteurs) — au lieu d'un appel
+ * séparé par question. Utilisé par la Section A pour générer les 15
+ * questions d'un coup, comme l'épreuve réelle, en économisant sur le
+ * nombre d'appels à l'API. Chaque prompt de scénario garde les mêmes
+ * règles que demanderMiseEnSituation (aucun calcul, aucune valeur
+ * inventée par Gemini) ; seul l'habillage narratif change d'un scénario
+ * à l'autre.
+ */
+export async function demanderLotMisesEnSituation(promptsScenarios: string[]): Promise<string[]> {
+  if (promptsScenarios.length === 0) return [];
+
+  const prompt = [
+    "Tu écris des mises en situation courtes (1 à 2 phrases chacune), en français québécois neutre,",
+    "pour une série de questions de sciences de 4e secondaire. Voici les consignes pour chaque scénario,",
+    "numérotées dans l'ordre — traite-les TOUTES, une réponse par scénario, dans le même ordre :",
+    "",
+    ...promptsScenarios.map((p, i) => `--- Scénario ${i + 1} ---\n${p}`),
+    "",
+    `Réponds uniquement avec un JSON strict de la forme {"misesEnSituation": ["...", "...", ...]},`,
+    `contenant EXACTEMENT ${promptsScenarios.length} chaînes, dans le même ordre que les scénarios ci-dessus,`,
+    "sans aucun autre texte.",
+  ].join("\n");
+
+  const resultat = await appellerGemini(prompt);
+
+  const liste = (resultat as Record<string, unknown> | null)?.misesEnSituation;
+  if (!Array.isArray(liste) || liste.length !== promptsScenarios.length || liste.some((v) => typeof v !== "string" || v.trim().length < 5)) {
+    throw new GeminiRequestError(
+      `Réponse Gemini incomplète : ${promptsScenarios.length} mises en situation attendues, réponse non conforme.`
+    );
+  }
+
+  return (liste as string[]).map((s) => s.trim());
+}
+
+/**
+ * Corrige une réponse écrite libre (démarche, explication) à crédit
+ * partiel. Gemini ne juge QUE la qualité et la complétude de
+ * l'explication de l'élève par rapport aux critères et à la réponse
+ * modèle déjà déterminés par ce code — jamais si le fait scientifique
+ * sous-jacent est vrai (ce fait est fixé avant l'appel, jamais inventé
+ * ni vérifié par Gemini).
+ */
+export interface CorrectionTexteLibre {
+  points: number;
+  retroaction: string;
+}
+
+export async function corrigerReponseTexteLibre(params: {
+  enonce: string;
+  criteresCorrection: string[];
+  reponseModele: string;
+  pointsMax: number;
+  reponseEleve: string;
+}): Promise<CorrectionTexteLibre> {
+  const prompt = [
+    "Tu corriges une réponse écrite d'élève pour une épreuve de sciences et technologie de 4e secondaire (Québec).",
+    `Question posée à l'élève : "${params.enonce}"`,
+    `Cette sous-question vaut ${params.pointsMax} point(s) au maximum.`,
+    `Critères qu'une réponse complète et correcte doit couvrir : ${params.criteresCorrection.join("; ")}.`,
+    `Exemple de réponse complète et correcte (à titre de calibrage, pas à recopier) : "${params.reponseModele}"`,
+    `Réponse écrite par l'élève : "${params.reponseEleve.trim() || "(aucune réponse)"}"`,
+    `Attribue un score entier entre 0 et ${params.pointsMax} selon le nombre de critères correctement couverts,`,
+    "en acceptant les formulations différentes de l'exemple tant que le sens scientifique et technologique est exact.",
+    "N'invente et ne corrige AUCUN fait scientifique toi-même : base-toi uniquement sur les critères fournis.",
+    'Réponds uniquement avec un JSON strict de la forme {"points": 0, "retroaction": "..."}, sans aucun autre texte.',
+  ].join("\n");
+
+  const resultat = await appellerGemini(prompt);
+  const points = (resultat as Record<string, unknown> | null)?.points;
+  const retroaction = (resultat as Record<string, unknown> | null)?.retroaction;
+
+  if (
+    typeof points !== "number" ||
+    !Number.isFinite(points) ||
+    points < 0 ||
+    points > params.pointsMax ||
+    typeof retroaction !== "string" ||
+    retroaction.trim().length < 2
+  ) {
+    throw new GeminiRequestError("Réponse Gemini incomplète ou hors barème pour la correction de texte libre.");
+  }
+
+  return { points: Math.round(points), retroaction: retroaction.trim() };
 }

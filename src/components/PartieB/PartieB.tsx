@@ -2,6 +2,8 @@ import { useState } from "react";
 import { genererQuestionCourte } from "../../generators/reponseCourteGenerator";
 import { useGenerationQuestion } from "../../hooks/useGenerationQuestion";
 import { EtatChargement, EtatErreur } from "../EtatsAsynchrones";
+import SousQuestionBloc from "../SousQuestionBloc";
+import type { ResultatSousQuestion } from "../../types/question";
 
 interface PartieBProps {
   onRetour: () => void;
@@ -9,34 +11,24 @@ interface PartieBProps {
 
 export default function PartieB({ onRetour }: PartieBProps) {
   const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionCourte);
-  const [saisie, setSaisie] = useState("");
-  const [verifie, setVerifie] = useState(false);
-  const [bonnes, setBonnes] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
+  const [pointsTotal, setPointsTotal] = useState(0);
+  const [pointsMaxTotal, setPointsMaxTotal] = useState(0);
 
-  const valeurSaisie = Number(saisie.replace(",", "."));
-
-  function calculerEcart(): number {
-    if (!question) return Infinity;
-    return question.reponseAttendue === 0
-      ? Math.abs(valeurSaisie)
-      : Math.abs((valeurSaisie - question.reponseAttendue) / question.reponseAttendue);
+  function noterSousQuestion(r: ResultatSousQuestion) {
+    setResultats((prev) => ({ ...prev, [r.sousQuestionId]: r }));
   }
 
-  const estCorrect = question ? verifie && !Number.isNaN(valeurSaisie) && calculerEcart() <= question.toleranceRelative : false;
-
-  function verifier() {
-    if (saisie.trim() === "" || !question) return;
-    setVerifie(true);
-    setTotal((t) => t + 1);
-    if (!Number.isNaN(valeurSaisie) && calculerEcart() <= question.toleranceRelative) {
-      setBonnes((b) => b + 1);
-    }
-  }
+  const toutesNotees = question ? question.sousQuestions.every((sq) => resultats[sq.id]) : false;
 
   function nouvelleQuestion() {
-    setSaisie("");
-    setVerifie(false);
+    if (question && toutesNotees) {
+      const gagnes = question.sousQuestions.reduce((s, sq) => s + (resultats[sq.id]?.points ?? 0), 0);
+      const max = question.sousQuestions.reduce((s, sq) => s + sq.bareme.pointsMax, 0);
+      setPointsTotal((p) => p + gagnes);
+      setPointsMaxTotal((m) => m + max);
+    }
+    setResultats({});
     regenerer();
   }
 
@@ -46,9 +38,9 @@ export default function PartieB({ onRetour }: PartieBProps) {
         <button className="retour-lien" onClick={onRetour} type="button">
           ← Modules
         </button>
-        {total > 0 && (
+        {pointsMaxTotal > 0 && (
           <span className="compteur">
-            {bonnes}/{total} bonnes réponses
+            {pointsTotal}/{pointsMaxTotal} points
           </span>
         )}
       </div>
@@ -65,45 +57,14 @@ export default function PartieB({ onRetour }: PartieBProps) {
           <>
             <p className="question-enonce">{question.enonce}</p>
 
-            <ul className="demarche-hints">
-              {question.etapesDemarche.map((etape, i) => (
-                <li key={i}>{etape}</li>
-              ))}
-            </ul>
-
-            <div className="reponse-inline">
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="Ta réponse"
-                value={saisie}
-                disabled={verifie}
-                onChange={(e) => setSaisie(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && verifier()}
-              />
-              <span className="unite">{question.uniteAttendue}</span>
-            </div>
-
-            {verifie && (
-              <div className={`feedback ${estCorrect ? "succes" : "erreur"}`}>
-                <strong>
-                  {estCorrect
-                    ? "Exact."
-                    : `Réponse attendue : ${question.reponseAttendue} ${question.uniteAttendue}`}
-                </strong>
-                {question.explication}
-              </div>
-            )}
+            {question.sousQuestions.map((sq) => (
+              <SousQuestionBloc key={sq.id} sousQuestion={sq} onNote={noterSousQuestion} />
+            ))}
           </>
         )}
       </div>
 
-      {question && !verifie && !chargement && !erreur && (
-        <button type="button" className="primary" disabled={saisie.trim() === ""} onClick={verifier}>
-          Vérifier
-        </button>
-      )}
-      {verifie && (
+      {question && toutesNotees && !chargement && !erreur && (
         <button type="button" className="primary" onClick={nouvelleQuestion}>
           Question suivante
         </button>

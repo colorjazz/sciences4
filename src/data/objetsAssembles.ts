@@ -17,14 +17,37 @@
  * ------------------------------------------------------------------
  */
 
-import type { EtapeMecanisme, TypeObjetAssemble, SousQuestionAnalyse } from "../types/question";
+import type { EtapeMecanisme, TypeObjetAssemble, SousQuestionNotee, SousQuestionTexteLibre, CircuitElectrique } from "../types/question";
+import { construireCircuitSimple } from "../engines/circuitEngine";
 
 export interface ObjetAssemble {
   id: TypeObjetAssemble;
   nom: string;
   categorie: string;
+  fonctionGlobale: string;
   etapes: EtapeMecanisme[];
-  questions: SousQuestionAnalyse[];
+  questions: SousQuestionNotee[];
+  /** Absent pour un objet entièrement manuel (ex. tondeuse à cylindre) */
+  circuitElectrique?: CircuitElectrique;
+}
+
+/** Question ouverte notée par Gemini (voir geminiClient.ts) — le fait scientifique reste fixé ici, jamais inventé par Gemini. */
+function texteLibre(params: {
+  id: string;
+  enonce: string;
+  reponseAttendue: string;
+  explication: string;
+  pointsMax?: number;
+}): SousQuestionTexteLibre {
+  return {
+    id: params.id,
+    typeReponse: "texte-libre",
+    enonce: params.enonce,
+    bareme: { pointsMax: params.pointsMax ?? 2 },
+    criteresCorrection: [params.reponseAttendue],
+    reponseModele: params.reponseAttendue,
+    explication: params.explication,
+  };
 }
 
 const etapesBatteur: EtapeMecanisme[] = [
@@ -81,28 +104,28 @@ const etapesBatteur: EtapeMecanisme[] = [
   },
 ];
 
-const questionsBatteur: SousQuestionAnalyse[] = [
-  {
+const questionsBatteur: SousQuestionNotee[] = [
+  texteLibre({
     id: "q1",
     enonce: "Pourquoi le réducteur contient-il une grande roue après le petit pignon ?",
-    reponseAttendue: "Pour réduire la vitesse de rotation",
+    reponseAttendue: "Pour réduire la vitesse de rotation (et augmenter le couple)",
     explication:
       "Une roue menée plus grande parcourt davantage de dents à chaque tour du pignon. La sortie tourne moins vite, mais elle peut fournir davantage de couple.",
-  },
-  {
+  }),
+  texteLibre({
     id: "q2",
     enonce: "Quelle est la fonction de la courroie crantée dans cette chaîne ?",
     reponseAttendue: "Transmettre la rotation sans glissement",
     explication:
       "Les dents de la courroie s'engrènent avec celles des poulies. La synchronisation entre les axes reste donc précise.",
-  },
-  {
+  }),
+  texteLibre({
     id: "q3",
     enonce: "Pourquoi les deux fouets tournent-ils autour de leurs axes verticaux ?",
     reponseAttendue: "Pour entraîner et mélanger la préparation",
     explication:
       "Le moteur fournit une rotation continue. Les engrenages, la courroie et l'arbre de sortie la transmettent aux deux fouets, qui brassent la préparation sans mouvement vertical.",
-  },
+  }),
 ];
 
 const etapesTondeuse: EtapeMecanisme[] = [
@@ -139,27 +162,27 @@ const etapesTondeuse: EtapeMecanisme[] = [
   },
 ];
 
-const questionsTondeuse: SousQuestionAnalyse[] = [
-  {
+const questionsTondeuse: SousQuestionNotee[] = [
+  texteLibre({
     id: "mower-q1",
     enonce: "Comment la roue et l'essieu transmettent-ils la poussée au mécanisme ?",
     reponseAttendue: "La roue transforme le déplacement en rotation de l'essieu",
     explication:
       "Quand la tondeuse avance, les roues roulent sur le sol. Elles font tourner l'essieu, qui devient l'entrée de la transmission.",
-  },
-  {
+  }),
+  texteLibre({
     id: "mower-q2",
     enonce: "Quel est le rôle de l'engrenage entre l'essieu et le cylindre de coupe ?",
     reponseAttendue: "Transmettre et adapter la rotation",
     explication:
       "Les pignons restent en prise et transmettent le mouvement jusqu'au cylindre. Leur rapport peut augmenter sa vitesse pour couper efficacement l'herbe.",
-  },
-  {
+  }),
+  texteLibre({
     id: "mower-q3",
     enonce: "À quoi sert le levier placé sur le châssis ?",
     reponseAttendue: "Régler la hauteur de coupe",
     explication: "Le levier offre un bras de levier pour déplacer le châssis et choisir la distance entre les lames et le sol.",
-  },
+  }),
 ];
 
 export const BANQUE_OBJETS_ASSEMBLES: ObjetAssemble[] = [
@@ -167,15 +190,19 @@ export const BANQUE_OBJETS_ASSEMBLES: ObjetAssemble[] = [
     id: "mixer",
     nom: "un batteur électrique de cuisine",
     categorie: "transmission",
+    fonctionGlobale: "Mélanger des ingrédients de cuisine",
     etapes: etapesBatteur,
     questions: questionsBatteur,
+    circuitElectrique: construireCircuitSimple({ interrupteur: "interrupteur-levier", sortie: "moteur" }),
   },
   {
     id: "reel-mower",
     nom: "une tondeuse à gazon manuelle à cylindre",
     categorie: "transmission",
+    fonctionGlobale: "Couper le gazon sans moteur",
     etapes: etapesTondeuse,
     questions: questionsTondeuse,
+    // Entièrement manuelle : aucun circuit électrique associé.
   },
 ];
 
