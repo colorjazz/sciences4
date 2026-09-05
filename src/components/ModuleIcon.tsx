@@ -1,5 +1,5 @@
 interface IconProps {
-  name: "eclair" | "regle" | "engrenage";
+  name: "eclair" | "regle" | "engrenage" | "cube";
 }
 
 /**
@@ -38,6 +38,13 @@ export function ModuleIcon({ name }: IconProps) {
         <svg {...common}>
           <circle cx="12" cy="12" r="3" />
           <path d="M12 2v3M12 19v3M22 12h-3M5 12H2M19.07 4.93l-2.12 2.12M7.05 16.95l-2.12 2.12M19.07 19.07l-2.12-2.12M7.05 7.05 4.93 4.93" />
+        </svg>
+      );
+    case "cube":
+      return (
+        <svg {...common}>
+          <path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" />
+          <path d="M4 7l8 4 8-4M12 11v10" />
         </svg>
       );
   }

@@ -3,13 +3,14 @@ import ParcoursSelector from "./components/ParcoursSelector/ParcoursSelector";
 import PartieA from "./components/PartieA/PartieA";
 import PartieB from "./components/PartieB/PartieB";
 import PartieC from "./components/PartieC/PartieC";
+import Atelier from "./components/SimulateurTechnologique/Atelier";
 import { Logomark } from "./components/Logomark";
 import { ModuleIcon } from "./components/ModuleIcon";
 import type { Parcours, SectionEpreuve } from "./types/curriculum";
 import { getStructureEpreuve } from "./types/curriculum";
 import { LIBELLES_MODULES } from "./utils/libellesPratique";
 
-type Vue = "parcours" | "modules" | SectionEpreuve;
+type Vue = "parcours" | "modules" | SectionEpreuve | "atelier";
 
 export default function App() {
   const [parcours, setParcours] = useState<Parcours | null>(null);
@@ -43,6 +44,7 @@ export default function App() {
       {vue === "A" && <PartieA onRetour={retourModules} />}
       {vue === "B" && <PartieB onRetour={retourModules} />}
       {vue === "C" && <PartieC onRetour={retourModules} />}
+      {vue === "atelier" && <Atelier onRetour={retourModules} />}
     </div>
   );
 }
@@ -88,6 +90,20 @@ function ModulesPratique({
             </button>
           );
         })}
+
+        <button
+          type="button"
+          className="module-card"
+          onClick={() => onSelection("atelier")}
+        >
+          <span className="module-icon">
+            <ModuleIcon name="cube" />
+          </span>
+          <span>
+            <h3>L'Atelier</h3>
+            <p>Explore et assemble des mécanismes en 3D.</p>
+          </span>
+        </button>
       </div>
 
       <button type="button" className="ghost" style={{ marginTop: "1.5rem" }} onClick={onRetour}>
