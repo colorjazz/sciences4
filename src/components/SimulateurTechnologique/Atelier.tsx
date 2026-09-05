@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+
 interface AtelierProps {
   onRetour: () => void;
 }
@@ -9,32 +11,25 @@ interface AtelierProps {
  * elle est déjà testée et fonctionnelle, et un deuxième moteur
  * Three.js dans le même bundle React entrerait en conflit avec
  * @react-three/fiber.
+ *
+ * Rendu en portail dans document.body (pas dans .app-shell) : l'Atelier
+ * a besoin de tout le viewport, mais .app-shell anime `transform`
+ * (fade-up au montage), ce qui en fait un containing block pour tout
+ * `position: fixed` descendant — sans le portail, le plein écran se
+ * retrouverait coincé dans la carte de 880px du reste du site.
  */
 const URL_ATELIER = "https://sciences3d.netlify.app";
 
 export default function Atelier({ onRetour }: AtelierProps) {
-  return (
-    <div className="panel">
-      <div className="module-header">
+  return createPortal(
+    <div className="atelier-fullscreen">
+      <div className="atelier-topbar">
         <button className="retour-lien" onClick={onRetour} type="button">
           ← Modules
         </button>
       </div>
-
-      <span className="eyebrow-label">Univers technologique</span>
-      <h2 style={{ marginBottom: "1rem" }}>L'Atelier — banc d'essai des mécanismes</h2>
-      <p className="lede" style={{ marginBottom: "1.25rem" }}>
-        Explore des objets réels démontés en mécanismes 3D animés, ou
-        assemble ton propre mécanisme dans le générateur.
-      </p>
-
-      <div className="atelier-frame-wrap">
-        <iframe
-          src={URL_ATELIER}
-          title="Atelier des mécanismes"
-          className="atelier-frame"
-        />
-      </div>
-    </div>
+      <iframe src={URL_ATELIER} title="Atelier des mécanismes" className="atelier-frame-full" />
+    </div>,
+    document.body,
   );
 }

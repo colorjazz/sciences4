@@ -478,29 +478,33 @@ button.ghost:hover {
 }
 
 /* ----------------------------------------------------------
-   L'Atelier (Three.js autonome, embarqué en iframe)
+   L'Atelier (Three.js autonome, embarqué en iframe plein écran)
    ---------------------------------------------------------- */
 
-.atelier-frame-wrap {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  overflow: hidden;
+.atelier-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
   background: var(--paper);
 }
 
-.atelier-frame {
-  display: block;
-  width: 100%;
-  height: 78vh;
-  min-height: 520px;
-  border: none;
+.atelier-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-raised);
 }
 
-@media (max-width: 560px) {
-  .atelier-frame {
-    height: 70vh;
-    min-height: 420px;
-  }
+.atelier-frame-full {
+  flex: 1 1 auto;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 
 /* ----------------------------------------------------------
