@@ -145,6 +145,29 @@ dans `netlify.toml`).
 - [x] **Vue d'ensemble du poteau** (`PoteauCompletViewer.tsx`) : les deux mécanismes composés affichés à leur position réelle sur une structure fixe
 - [x] **Objets techniques composés, générés par l'IA** : chaque question (voie procédurale) invente un objet composé de deux mécanismes qui interagissent
 - [x] Bug corrigé : `useFrame` déplacé dans des composants "Scene" internes rendus à l'intérieur de `<Canvas>` (règle R3F)
+- [x] **L'Atelier** : nouveau module intégrant l'application Atelier des
+  Mécanismes (dépôt séparé `colorjazz/sciences4_3d`, Three.js autonome)
+  en iframe plein écran (`src/components/SimulateurTechnologique/Atelier.tsx`,
+  rendu en portail `document.body` — `.app-shell` anime `transform`, ce
+  qui en ferait un containing block pour un `position: fixed` interne).
+- [x] **Notation à crédit partiel** (Sections B et C) : chaque
+  sous-question a son propre barème (1 à 4 points), pas juste bon/mauvais.
+  Nouveau moteur déterministe `engines/notationEngine.ts` pour tout ce qui
+  a une réponse objectivement vraie ; pour le texte libre, Gemini évalue
+  seulement la qualité d'une explication par rapport à des critères déjà
+  déterminés par ce code (`geminiClient.ts`, `corrigerReponseTexteLibre`)
+  — jamais un fait scientifique. Composant partagé
+  `src/components/SousQuestionBloc.tsx` utilisé par B et C.
+- [x] **QCM à deux formats** (Section A) : fait unique ou tableau
+  multi-faits. Les 15 questions d'une session sont générées en UN SEUL
+  appel réseau à Gemini (`demanderLotMisesEnSituation`), pas un appel par
+  question.
+- [x] **Section C repensée** : un seul objet technique dont les
+  composants mécaniques ET électriques sont analysés ensemble (fonction
+  globale, `engines/circuitEngine.ts` + `CircuitViewer.tsx` pour le
+  schéma SVG du circuit), avec des sous-questions notées de types variés
+  (choix unique, mots de banque, texte libre) au lieu d'une simple liste
+  de réponses à révéler.
 - [ ] Pondération du tirage aléatoire selon la vraie répartition MEQ par univers/section
 - [ ] Génération ATS (même architecture, concepts différents)
 - [ ] Élargissement des Sections A/B au-delà des 5 concepts actuels
