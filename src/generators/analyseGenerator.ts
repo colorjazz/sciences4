@@ -713,7 +713,7 @@ async function genererMiseEnSituationAssemblage(nomObjet: string): Promise<strin
   return demanderContexteApplication(prompt);
 }
 
-async function genAnalyseAssemblage(parcours: Parcours = "ST"): Promise<QuestionAnalyse> {
+export async function genAnalyseAssemblage(parcours: Parcours = "ST"): Promise<QuestionAnalyse> {
   const objet = choisirObjetAssembleAleatoire();
   const contexte = await genererMiseEnSituationAssemblage(objet.nom);
 
@@ -735,17 +735,10 @@ async function genAnalyseAssemblage(parcours: Parcours = "ST"): Promise<Question
 }
 
 // ============================================================
-// Dispatcheur — alterne entre la composition procédurale (variété
-// infinie de mécanismes) et la banque riche à géométrie fixe (détail
-// visuel supérieur, choix limité mais mise en situation renouvelée).
-// Ajuste ce ratio librement selon ce que tu observes en pratique.
+// Section C se scinde en deux modes distincts côté PartieC.tsx :
+// « Simulation de l'épreuve » (genAnalyseAssemblage — banque riche à
+// géométrie fixe, un seul objet cohérent, comme la vraie épreuve) et
+// « Exercices » (genererQuestionAnalyseComposee — composition
+// procédurale à variété infinie, pour s'entraîner notion par notion).
+// Plus de dispatcheur aléatoire entre les deux : l'élève choisit.
 // ============================================================
-
-const PROBABILITE_ASSEMBLAGE_RICHE = 0.5;
-
-export async function genererQuestionAnalyse(parcours: Parcours = "ST"): Promise<QuestionAnalyse> {
-  if (Math.random() < PROBABILITE_ASSEMBLAGE_RICHE) {
-    return genAnalyseAssemblage(parcours);
-  }
-  return genererQuestionAnalyseComposee(parcours);
-}

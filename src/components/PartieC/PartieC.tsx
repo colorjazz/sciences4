@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { genererQuestionAnalyse } from "../../generators/analyseGenerator";
+import { genAnalyseAssemblage, genererQuestionAnalyseComposee } from "../../generators/analyseGenerator";
 import { useGenerationQuestion } from "../../hooks/useGenerationQuestion";
 import { EtatChargement, EtatErreur } from "../EtatsAsynchrones";
 import MecanismeViewer, { LegendeMecanisme } from "../SimulateurTechnologique/MecanismeViewer";
@@ -16,7 +16,7 @@ interface PartieCProps {
   onRetour: () => void;
 }
 
-type VueSectionC = "atelier" | "analyse";
+type VueSectionC = "atelier" | "choix" | "simulation" | "exercice";
 
 function TitreSousSection({ children }: { children: React.ReactNode }) {
   return (
@@ -37,13 +37,18 @@ function TitreSousSection({ children }: { children: React.ReactNode }) {
 
 export default function PartieC({ parcours, onRetour }: PartieCProps) {
   const [vueSectionC, setVueSectionC] = useState<VueSectionC>("atelier");
-  const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(
-    () => genererQuestionAnalyse(parcours),
-    { autoStart: false }
-  );
+
+  const simulation = useGenerationQuestion(() => genAnalyseAssemblage(parcours), { autoStart: false });
+  const exercice = useGenerationQuestion(() => genererQuestionAnalyseComposee(parcours), { autoStart: false });
+
   const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
   const [pointsTotal, setPointsTotal] = useState(0);
   const [pointsMaxTotal, setPointsMaxTotal] = useState(0);
+  const [simulationTerminee, setSimulationTerminee] = useState(false);
+
+  const estSimulation = vueSectionC === "simulation";
+  const actif = estSimulation ? simulation : exercice;
+  const { donnee: question, chargement, erreur } = actif;
 
   function noterSousQuestion(r: ResultatSousQuestion) {
     setResultats((prev) => ({ ...prev, [r.sousQuestionId]: r }));
@@ -51,7 +56,34 @@ export default function PartieC({ parcours, onRetour }: PartieCProps) {
 
   const toutesNotees = question ? question.sousQuestions.every((sq) => resultats[sq.id]) : false;
 
-  function nouvelleAnalyse() {
+  function commencerSimulation() {
+    setResultats({});
+    setSimulationTerminee(false);
+    setPointsTotal(0);
+    setPointsMaxTotal(0);
+    setVueSectionC("simulation");
+    simulation.regenerer();
+  }
+
+  function commencerExercices() {
+    setResultats({});
+    setPointsTotal(0);
+    setPointsMaxTotal(0);
+    setVueSectionC("exercice");
+    exercice.regenerer();
+  }
+
+  function terminerSimulation() {
+    if (question && toutesNotees) {
+      const gagnes = question.sousQuestions.reduce((s, sq) => s + (resultats[sq.id]?.points ?? 0), 0);
+      const max = question.sousQuestions.reduce((s, sq) => s + sq.bareme.pointsMax, 0);
+      setPointsTotal(gagnes);
+      setPointsMaxTotal(max);
+    }
+    setSimulationTerminee(true);
+  }
+
+  function nouvelExercice() {
     if (question && toutesNotees) {
       const gagnes = question.sousQuestions.reduce((s, sq) => s + (resultats[sq.id]?.points ?? 0), 0);
       const max = question.sousQuestions.reduce((s, sq) => s + sq.bareme.pointsMax, 0);
@@ -59,18 +91,58 @@ export default function PartieC({ parcours, onRetour }: PartieCProps) {
       setPointsMaxTotal((m) => m + max);
     }
     setResultats({});
-    regenerer();
+    exercice.regenerer();
   }
 
   if (vueSectionC === "atelier") {
-    return <Atelier onRetour={onRetour} onExercer={() => setVueSectionC("analyse")} labelRetour="← Modules" />;
+    return <Atelier onRetour={onRetour} onExercer={() => setVueSectionC("choix")} labelRetour="← Modules" />;
+  }
+
+  if (vueSectionC === "choix") {
+    return (
+      <div className="panel">
+        <div className="module-header">
+          <button className="retour-lien" onClick={() => setVueSectionC("atelier")} type="button">
+            ← L'Atelier
+          </button>
+        </div>
+
+        <span className="eyebrow-label">Section C</span>
+        <h2 style={{ marginBottom: "0.5rem" }}>Analyse technologique</h2>
+        <p className="lede" style={{ marginBottom: "1.25rem" }}>
+          Choisis comment tu veux t'exercer.
+        </p>
+
+        <div className="modules-grid">
+          <button type="button" className="module-card" onClick={commencerSimulation}>
+            <h3>Simulation de l'épreuve</h3>
+            <p>
+              Un seul objet technique complet, comme à l'examen : fonction globale, mécanismes, matériau, circuit —
+              noté avec le vrai barème.
+            </p>
+            <span className="card-foot">
+              <span>1 objet</span>
+              <span className="card-arrow" aria-hidden="true">→</span>
+            </span>
+          </button>
+          <button type="button" className="module-card" onClick={commencerExercices}>
+            <h3>Exercices</h3>
+            <p>Entraîne-toi notion par notion, autant de fois que tu veux — pas une simulation de l'épreuve.</p>
+            <span className="card-foot">
+              <span>Illimité</span>
+              <span className="card-arrow" aria-hidden="true">→</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="panel">
       <div className="module-header">
-        <button className="retour-lien" onClick={() => setVueSectionC("atelier")} type="button">
-          ← L'Atelier
+        <button className="retour-lien" onClick={() => setVueSectionC("choix")} type="button">
+          ← Section C
         </button>
         {pointsMaxTotal > 0 && (
           <span className="compteur">
@@ -79,26 +151,15 @@ export default function PartieC({ parcours, onRetour }: PartieCProps) {
         )}
       </div>
 
-      <span className="eyebrow-label">Exercer</span>
+      <span className="eyebrow-label">{estSimulation ? "Simulation de l'épreuve" : "Exercices"}</span>
       <h2 style={{ marginBottom: "1.25rem" }}>Étudie cet objet technique</h2>
 
       <div className="question-card">
-        {!question && !chargement && !erreur && (
-          <div style={{ textAlign: "center", padding: "1.5rem 1rem" }}>
-            <p className="lede" style={{ margin: "0 auto 1.25rem", maxWidth: "42ch" }}>
-              Quand tu es prêt·e, génère un objet technique à analyser.
-            </p>
-            <button type="button" className="primary" style={{ marginTop: 0 }} onClick={regenerer}>
-              Générer un exercice
-            </button>
-          </div>
-        )}
-
         {chargement && <EtatChargement message="Invention d'un objet technique..." />}
 
-        {erreur && <EtatErreur message={erreur} onReessayer={regenerer} />}
+        {erreur && <EtatErreur message={erreur} onReessayer={actif.regenerer} />}
 
-        {question && !chargement && !erreur && (
+        {question && !chargement && !erreur && !(estSimulation && simulationTerminee) && (
           <>
             {question.fonctionGlobale && (
               <div className="fonction-globale-encadre">
@@ -146,10 +207,27 @@ export default function PartieC({ parcours, onRetour }: PartieCProps) {
             </div>
           </>
         )}
+
+        {estSimulation && simulationTerminee && (
+          <div className="resultat-final">
+            <span className="eyebrow-label">Résultat de la simulation</span>
+            <h2 style={{ margin: "0 0 0.5rem" }}>
+              {pointsTotal} / {pointsMaxTotal}
+            </h2>
+            <p className="lede">
+              {pointsMaxTotal > 0 ? Math.round((pointsTotal / pointsMaxTotal) * 100) : 0} % de bonnes réponses.
+            </p>
+          </div>
+        )}
       </div>
 
-      {question && toutesNotees && !chargement && !erreur && (
-        <button type="button" className="primary" style={{ marginTop: "1.25rem" }} onClick={nouvelleAnalyse}>
+      {estSimulation && question && toutesNotees && !simulationTerminee && !chargement && !erreur && (
+        <button type="button" className="primary" style={{ marginTop: "1.25rem" }} onClick={terminerSimulation}>
+          Voir le résultat
+        </button>
+      )}
+      {!estSimulation && question && toutesNotees && !chargement && !erreur && (
+        <button type="button" className="primary" style={{ marginTop: "1.25rem" }} onClick={nouvelExercice}>
           Nouvel objet technique
         </button>
       )}
