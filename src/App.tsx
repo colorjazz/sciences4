@@ -126,9 +126,15 @@ function ModulesPratique({
               className="module-card"
               onClick={() => onSelection(s.section)}
             >
-              <h3>
-                {libelle.logoPrefix && <span className="module-logo-prefix">{libelle.logoPrefix} </span>}
-                {libelle.titre}
+              <h3 className={libelle.logoPrefix ? "module-card-brand" : undefined}>
+                {libelle.logoPrefix ? (
+                  <>
+                    {libelle.logoPrefix}
+                    <span className="module-card-brand-tag">{libelle.titre}</span>
+                  </>
+                ) : (
+                  libelle.titre
+                )}
               </h3>
               <p>{libelle.description}</p>
               <span className="card-foot">

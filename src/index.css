@@ -534,10 +534,28 @@ button.ghost:hover {
 }
 
 /* Lettrage repris de la marque "atelier." (L'Atelier des mécanismes) :
-   Poppins très gras + point, pour signaler que ce module s'ouvre
-   directement dans L'Atelier. */
-.module-logo-prefix {
+   Poppins très gras + point, centré, avec le sous-titre en petites
+   capitales façon timbre en dessous — même traitement que l'écran
+   d'accueil de L'Atelier — pour signaler que ce module s'ouvre
+   directement dedans. */
+.module-card-brand {
+  font-family: var(--font-display);
   font-weight: 800;
+  font-size: 1.3rem;
+  line-height: 1.2;
+  text-align: center;
+  width: 100%;
+}
+
+.module-card-brand-tag {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--graphite-soft);
+  margin-top: 0.4rem;
 }
 
 .module-card p {
