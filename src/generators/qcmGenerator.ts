@@ -21,7 +21,8 @@
  */
 
 import type { QuestionQCM, ChoixQCM, ColonneQCMTableau, OptionQCMTableau } from "../types/question";
-import type { Parcours } from "../types/curriculum";
+import type { Parcours, UniversEvalue } from "../types/curriculum";
+import { getStructureEpreuve } from "../types/curriculum";
 import { resoudreLoiOhm } from "../engines/electriciteEngine";
 import {
   classifierPH,
@@ -32,6 +33,7 @@ import {
 } from "../engines/chimieEngine";
 import { genererTrainAleatoire, calculerSensRotation, calculerRapportVitesse } from "../engines/mecaniqueEngine";
 import { resoudreForceGravitationnelle, resoudreVitesse } from "../engines/mecaniqueForcesEngine";
+import { BANQUE_GAZ, classifierSystemeMeteo } from "../engines/terreEspaceEngine";
 import { demanderLotMisesEnSituation } from "../ai/geminiClient";
 
 function melanger<T>(items: T[]): T[] {
@@ -393,29 +395,148 @@ function construireScenarioVitesse(): ScenarioQCM {
 }
 
 // ------------------------------------------------------------
+// Terre et espace — Effet de serre (ST) / Cyclone et anticyclone (ATS)
+// (QCM simple, classification par table de référence). Sous-thème
+// Atmosphère — jusqu'ici le seul univers sans AUCUN scénario, malgré
+// une vraie pondération prévue dans STRUCTURE_EPREUVE_ST/ATS.
+// ------------------------------------------------------------
+
+function construireScenarioEffetDeSerre(): ScenarioQCM {
+  const gaz = BANQUE_GAZ[Math.floor(Math.random() * BANQUE_GAZ.length)];
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur la composition de l'atmosphère.",
+    `La situation doit mentionner ${gaz.nom} comme gaz étudié, sans dire s'il s'agit d'un gaz à effet de serre ou non.`,
+    "Choisis un contexte réaliste (mesure atmosphérique, laboratoire, procédé industriel) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "ges", texte: "C'est un gaz à effet de serre." },
+        { id: "non-ges", texte: "Ce n'est pas un gaz à effet de serre." },
+      ]);
+
+      return {
+        id: idAleatoire("qcm-effet-serre"),
+        type: "qcm",
+        section: "A",
+        univers: "terreEspace",
+        conceptId: "st-te-effet-serre",
+        enonce: `${miseEnSituation} ${gaz.nom[0].toUpperCase()}${gaz.nom.slice(1)} fait-il partie des gaz à effet de serre ?`,
+        choix,
+        bonneReponseId: gaz.classe,
+        explication:
+          gaz.classe === "ges"
+            ? `${gaz.nom} absorbe le rayonnement infrarouge terrestre : c'est un gaz à effet de serre.`
+            : `${gaz.nom} n'absorbe pas significativement le rayonnement infrarouge terrestre : ce n'est pas un gaz à effet de serre.`,
+      };
+    },
+  };
+}
+
+function construireScenarioCycloneAnticyclone(): ScenarioQCM {
+  const pression: "basse" | "haute" = Math.random() < 0.5 ? "basse" : "haute";
+  const classe = classifierSystemeMeteo(pression);
+  const sensRotation = pression === "basse" ? "convergent en spirale vers son centre" : "divergent en spirale depuis son centre";
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur un système météorologique observé par satellite.",
+    "Choisis une région ou un contexte réaliste — varie ton choix à chaque fois.",
+    "Ne mentionne AUCUNE pression (basse ou haute), ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "cyclone", texte: "Un cyclone (dépression)" },
+        { id: "anticyclone", texte: "Un anticyclone" },
+      ]);
+
+      return {
+        id: idAleatoire("qcm-cyclone"),
+        type: "qcm",
+        section: "A",
+        univers: "terreEspace",
+        conceptId: "ats-te-cyclone-anticyclone",
+        enonce: `${miseEnSituation} Les vents y ont un mouvement ${sensRotation}, autour d'une zone de ${pression} pression. Quel type de système météorologique est-ce ?`,
+        choix,
+        bonneReponseId: classe,
+        explication:
+          classe === "cyclone"
+            ? "Une zone de basse pression attire l'air en spirale vers son centre : c'est un cyclone (dépression)."
+            : "Une zone de haute pression repousse l'air en spirale depuis son centre : c'est un anticyclone.",
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
 // Génération par lot — un seul appel réseau pour tout le lot
 // ------------------------------------------------------------
 
 interface ScenarioDisponible {
   /** Parcours pour lesquels ce scénario est admissible (voir curriculum.ts). */
   parcours: Parcours[];
+  univers: UniversEvalue;
   construire: (parcours: Parcours) => ScenarioQCM;
 }
 
 const CONSTRUCTEURS_SCENARIO: ScenarioDisponible[] = [
-  { parcours: ["ST", "ATS"], construire: construireScenarioLoiOhm },
-  { parcours: ["ST"], construire: () => construireScenarioPh() },
-  { parcours: ["ST"], construire: () => construireScenarioBalancement() },
-  { parcours: ["ST", "ATS"], construire: construireScenarioTrainTableau },
-  { parcours: ["ATS"], construire: () => construireScenarioForceGravitationnelle() },
-  { parcours: ["ATS"], construire: () => construireScenarioVitesse() },
+  { parcours: ["ST", "ATS"], univers: "materiel", construire: construireScenarioLoiOhm },
+  { parcours: ["ST"], univers: "materiel", construire: () => construireScenarioPh() },
+  { parcours: ["ST"], univers: "materiel", construire: () => construireScenarioBalancement() },
+  { parcours: ["ST", "ATS"], univers: "technologique", construire: construireScenarioTrainTableau },
+  { parcours: ["ATS"], univers: "materiel", construire: () => construireScenarioForceGravitationnelle() },
+  { parcours: ["ATS"], univers: "materiel", construire: () => construireScenarioVitesse() },
+  { parcours: ["ST"], univers: "terreEspace", construire: () => construireScenarioEffetDeSerre() },
+  { parcours: ["ATS"], univers: "terreEspace", construire: () => construireScenarioCycloneAnticyclone() },
 ];
+
+/**
+ * Construit la file des univers à piger pour un lot, dans les
+ * proportions EXACTES prévues par l'épreuve réelle
+ * (STRUCTURE_EPREUVE_ST/ATS.sections[A].repartitionUnivers), mélangée
+ * pour ne pas grouper les questions par univers.
+ */
+function fileUniversPourSectionA(parcours: Parcours, nombreQuestions: number): UniversEvalue[] {
+  const structure = getStructureEpreuve(parcours);
+  const sectionA = structure.sections.find((s) => s.section === "A");
+  const repartition = sectionA?.repartitionUnivers ?? {};
+  const total = Object.values(repartition).reduce((a, b) => a + (b ?? 0), 0);
+
+  const file: UniversEvalue[] = [];
+  if (total > 0) {
+    (Object.entries(repartition) as [UniversEvalue, number | undefined][]).forEach(([univers, n]) => {
+      for (let i = 0; i < (n ?? 0); i++) file.push(univers);
+    });
+    // Ajuste le nombre de questions demandé (NOMBRE_QUESTIONS côté appelant)
+    // à la vraie taille de la répartition officielle : répète ou tronque la
+    // file plutôt que d'halluciner une proportion qui n'existe pas.
+    while (file.length < nombreQuestions) file.push(file[file.length % total]);
+    file.length = nombreQuestions;
+  }
+  return melanger(file);
+}
 
 export async function genererLotQuestionsQCM(nombreQuestions = 15, parcours: Parcours = "ST"): Promise<QuestionQCM[]> {
   const disponibles = CONSTRUCTEURS_SCENARIO.filter((c) => c.parcours.includes(parcours));
+  const fileUnivers = fileUniversPourSectionA(parcours, nombreQuestions);
+
   const scenarios: ScenarioQCM[] = [];
   for (let i = 0; i < nombreQuestions; i++) {
-    const entree = disponibles[Math.floor(Math.random() * disponibles.length)];
+    const universVoulu = fileUnivers[i];
+    // Repli sur l'ensemble des scénarios admissibles si cet univers n'a
+    // (encore) aucun scénario écrit pour ce parcours — mieux vaut une
+    // question hors proportion qu'une génération qui échoue.
+    const pourCetUnivers = universVoulu ? disponibles.filter((c) => c.univers === universVoulu) : [];
+    const pool = pourCetUnivers.length > 0 ? pourCetUnivers : disponibles;
+    const entree = pool[Math.floor(Math.random() * pool.length)];
     scenarios.push(entree.construire(parcours));
   }
 
