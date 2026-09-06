@@ -6,10 +6,12 @@
  * cette exactitude ne doit jamais être compromise.
  *
  * Ce fichier fait la traduction entre cette structure officielle et
- * le vocabulaire montré à l'élève. Consigne : ne jamais utiliser les
- * mots "épreuve", "examen" ou "ministériel" dans les libellés
- * destinés à l'interface. L'élève pratique des habiletés, il ne
- * "simule" pas un examen.
+ * le vocabulaire montré à l'élève. Consigne mise à jour à la demande
+ * explicite de l'utilisateur : les trois modules reprennent
+ * maintenant les noms de section réels de l'épreuve unique
+ * (Questions à choix multiple / à réponse construite / d'analyse
+ * technologique) — ce sont des noms génériques de structure
+ * d'épreuve, pas du contenu confidentiel d'une épreuve précise.
  * ------------------------------------------------------------------
  */
 
@@ -24,19 +26,19 @@ export interface LibellePratique {
 
 export const LIBELLES_MODULES: Record<SectionEpreuve, LibellePratique> = {
   A: {
-    titre: "Questions rapides",
+    titre: "Questions à choix multiple",
     description:
       "Vérifie ta compréhension des concepts clés, un choix à la fois.",
     icone: "eclair",
   },
   B: {
-    titre: "Résolution guidée",
+    titre: "Questions à réponse construite",
     description:
       "Applique une formule, montre ta démarche, arrive à la bonne réponse.",
     icone: "regle",
   },
   C: {
-    titre: "Analyse technique",
+    titre: "Questions d'analyse technologique",
     description:
       "Étudie un mécanisme ou un objet et explique son fonctionnement.",
     icone: "engrenage",

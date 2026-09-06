@@ -54,7 +54,7 @@ export default function PartieA({ onRetour }: PartieAProps) {
         )}
       </div>
 
-      <span className="eyebrow-label">Questions rapides</span>
+      <span className="eyebrow-label">Questions à choix multiple</span>
       <h2 style={{ marginBottom: "1.25rem" }}>Un concept à la fois</h2>
 
       <div className="question-card">

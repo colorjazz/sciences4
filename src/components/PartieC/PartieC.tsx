@@ -5,6 +5,7 @@ import { EtatChargement, EtatErreur } from "../EtatsAsynchrones";
 import MecanismeViewer, { LegendeMecanisme } from "../SimulateurTechnologique/MecanismeViewer";
 import PoteauCompletViewer from "../SimulateurTechnologique/PoteauCompletViewer";
 import CircuitViewer from "../SimulateurTechnologique/CircuitViewer";
+import Atelier from "../SimulateurTechnologique/Atelier";
 import AssemblagePanel from "./AssemblagePanel";
 import SousQuestionBloc from "../SousQuestionBloc";
 import type { ResultatSousQuestion } from "../../types/question";
@@ -12,6 +13,8 @@ import type { ResultatSousQuestion } from "../../types/question";
 interface PartieCProps {
   onRetour: () => void;
 }
+
+type VueSectionC = "analyse" | "atelier";
 
 function TitreSousSection({ children }: { children: React.ReactNode }) {
   return (
@@ -31,6 +34,7 @@ function TitreSousSection({ children }: { children: React.ReactNode }) {
 }
 
 export default function PartieC({ onRetour }: PartieCProps) {
+  const [vueSectionC, setVueSectionC] = useState<VueSectionC>("analyse");
   const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionAnalyse);
   const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
   const [pointsTotal, setPointsTotal] = useState(0);
@@ -53,6 +57,10 @@ export default function PartieC({ onRetour }: PartieCProps) {
     regenerer();
   }
 
+  if (vueSectionC === "atelier") {
+    return <Atelier onRetour={() => setVueSectionC("analyse")} labelRetour="← Analyser un objet" />;
+  }
+
   return (
     <div className="panel">
       <div className="module-header">
@@ -66,8 +74,17 @@ export default function PartieC({ onRetour }: PartieCProps) {
         )}
       </div>
 
-      <span className="eyebrow-label">Analyse technique</span>
+      <span className="eyebrow-label">Questions d'analyse technologique</span>
       <h2 style={{ marginBottom: "1.25rem" }}>Étudie cet objet technique</h2>
+
+      <div className="segmented-control">
+        <button type="button" className="active" onClick={() => setVueSectionC("analyse")}>
+          Analyser un objet
+        </button>
+        <button type="button" onClick={() => setVueSectionC("atelier")}>
+          L'Atelier
+        </button>
+      </div>
 
       <div className="question-card">
         {chargement && <EtatChargement message="Invention d'un objet technique..." />}

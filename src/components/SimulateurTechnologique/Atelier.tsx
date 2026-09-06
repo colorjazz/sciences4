@@ -2,6 +2,8 @@ import { createPortal } from "react-dom";
 
 interface AtelierProps {
   onRetour: () => void;
+  /** Texte du bouton de retour — dépend d'où l'Atelier a été ouvert. */
+  labelRetour?: string;
 }
 
 /**
@@ -20,12 +22,12 @@ interface AtelierProps {
  */
 const URL_ATELIER = "https://sciences3d.netlify.app";
 
-export default function Atelier({ onRetour }: AtelierProps) {
+export default function Atelier({ onRetour, labelRetour = "← Modules" }: AtelierProps) {
   return createPortal(
     <div className="atelier-fullscreen">
       <div className="atelier-topbar">
         <button className="retour-lien" onClick={onRetour} type="button">
-          ← Modules
+          {labelRetour}
         </button>
       </div>
       <iframe src={URL_ATELIER} title="Atelier des mécanismes" className="atelier-frame-full" />

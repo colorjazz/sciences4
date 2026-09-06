@@ -45,7 +45,7 @@ export default function PartieB({ onRetour }: PartieBProps) {
         )}
       </div>
 
-      <span className="eyebrow-label">Résolution guidée</span>
+      <span className="eyebrow-label">Questions à réponse construite</span>
       <h2 style={{ marginBottom: "1.25rem" }}>Montre ta démarche</h2>
 
       <div className="question-card">
