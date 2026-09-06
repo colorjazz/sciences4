@@ -35,7 +35,9 @@ function TitreSousSection({ children }: { children: React.ReactNode }) {
 
 export default function PartieC({ onRetour }: PartieCProps) {
   const [vueSectionC, setVueSectionC] = useState<VueSectionC>("analyse");
-  const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionAnalyse);
+  const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionAnalyse, {
+    autoStart: false,
+  });
   const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
   const [pointsTotal, setPointsTotal] = useState(0);
   const [pointsMaxTotal, setPointsMaxTotal] = useState(0);
@@ -87,6 +89,17 @@ export default function PartieC({ onRetour }: PartieCProps) {
       </div>
 
       <div className="question-card">
+        {!question && !chargement && !erreur && (
+          <div style={{ textAlign: "center", padding: "1.5rem 1rem" }}>
+            <p className="lede" style={{ margin: "0 auto 1.25rem", maxWidth: "42ch" }}>
+              Quand tu es prêt·e, génère un objet technique à analyser.
+            </p>
+            <button type="button" className="primary" style={{ marginTop: 0 }} onClick={regenerer}>
+              Générer un exercice
+            </button>
+          </div>
+        )}
+
         {chargement && <EtatChargement message="Invention d'un objet technique..." />}
 
         {erreur && <EtatErreur message={erreur} onReessayer={regenerer} />}

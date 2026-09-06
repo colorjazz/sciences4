@@ -10,11 +10,22 @@ interface EtatGeneration<T> {
  * Pilote un appel de génération asynchrone (question IA). Ignore les
  * réponses qui arrivent après qu'un nouvel appel a été lancé, pour
  * éviter d'afficher une question périmée si l'élève clique vite.
+ *
+ * `autoStart` (true par défaut) lance la génération dès le montage.
+ * Mettre `false` quand l'arrivée sur l'écran ne doit PAS déclencher
+ * un appel IA tout de suite (ex. Section C : arriver sur l'onglet
+ * "L'Atelier" ne doit pas générer un exercice d'analyse en retrait) —
+ * l'appelant déclenche alors la première génération lui-même via
+ * `regenerer()`, typiquement depuis un bouton.
  */
-export function useGenerationQuestion<T>(generateur: () => Promise<T>) {
+export function useGenerationQuestion<T>(
+  generateur: () => Promise<T>,
+  options?: { autoStart?: boolean },
+) {
+  const autoStart = options?.autoStart ?? true;
   const [etat, setEtat] = useState<EtatGeneration<T>>({
     donnee: null,
-    chargement: true,
+    chargement: autoStart,
     erreur: null,
   });
   const compteurAppel = useRef(0);
@@ -37,7 +48,8 @@ export function useGenerationQuestion<T>(generateur: () => Promise<T>) {
   }, []);
 
   useEffect(() => {
-    generer();
+    if (autoStart) generer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generer]);
 
   return { ...etat, regenerer: generer };
