@@ -44,6 +44,10 @@ export default function ParcoursSelector({ onConfirm }: ParcoursSelectorProps) {
             <span className="code">{p}</span>
             <h3>{DESCRIPTIONS[p].titre}</h3>
             <p>{DESCRIPTIONS[p].sousTitre}</p>
+            <span className="card-foot">
+              <span>{selection === p ? "Sélectionné" : "Choisir"}</span>
+              <span className="card-arrow" aria-hidden="true">→</span>
+            </span>
           </button>
         ))}
       </div>
