@@ -61,6 +61,18 @@ import { construireCircuitSimple, LIBELLE_FONCTION_ELECTRIQUE } from "../engines
 import { demanderObjetCompose, demanderContexteApplication } from "../ai/geminiClient";
 import { choisirObjetAssembleAleatoire } from "../data/objetsAssembles";
 import type { CircuitElectrique } from "../types/question";
+import type { Parcours } from "../types/curriculum";
+
+/**
+ * L'Univers technologique est largement commun aux deux parcours
+ * (voir curriculum.ts) : les mêmes concepts existent sous les deux
+ * préfixes st-/ats- avec le même suffixe. Convertit un conceptId
+ * ST (utilisé comme référence dans ce fichier) vers son équivalent
+ * ATS si nécessaire.
+ */
+function versConceptIdParcours(parcours: Parcours, conceptIdSt: string): string {
+  return parcours === "ATS" ? conceptIdSt.replace(/^st-/, "ats-") : conceptIdSt;
+}
 
 function idAleatoire(prefixe: string): string {
   return `${prefixe}-${Math.random().toString(36).slice(2, 9)}`;
@@ -633,7 +645,7 @@ function construireSousQuestionMateriau(piece: string, materiauNom: string, prop
   };
 }
 
-export async function genererQuestionAnalyseComposee(): Promise<QuestionAnalyse> {
+export async function genererQuestionAnalyseComposee(parcours: Parcours = "ST"): Promise<QuestionAnalyse> {
   const cle1 = MECANISMES_TRANSMISSION[Math.floor(Math.random() * MECANISMES_TRANSMISSION.length)];
   const cle2 = MECANISMES_TRANSFORMATION[Math.floor(Math.random() * MECANISMES_TRANSFORMATION.length)];
 
@@ -661,7 +673,7 @@ export async function genererQuestionAnalyseComposee(): Promise<QuestionAnalyse>
     // Remarque : l'objet mélange toujours transmission (mécanisme 1) et
     // transformation (mécanisme 2) ; on tague ici sur le premier, faute
     // d'un modèle à concepts multiples pour l'instant.
-    conceptId: CONCEPT_ID_PAR_MECANISME[cle1],
+    conceptId: versConceptIdParcours(parcours, CONCEPT_ID_PAR_MECANISME[cle1]),
     enonce: "Analyse l'objet technique suivant : décris ses composants mécaniques et électriques et explique comment ils interagissent.",
     fonctionGlobale: objet.fonctionGlobale,
     descriptionObjet,
@@ -701,7 +713,7 @@ async function genererMiseEnSituationAssemblage(nomObjet: string): Promise<strin
   return demanderContexteApplication(prompt);
 }
 
-async function genAnalyseAssemblage(): Promise<QuestionAnalyse> {
+async function genAnalyseAssemblage(parcours: Parcours = "ST"): Promise<QuestionAnalyse> {
   const objet = choisirObjetAssembleAleatoire();
   const contexte = await genererMiseEnSituationAssemblage(objet.nom);
 
@@ -712,7 +724,7 @@ async function genAnalyseAssemblage(): Promise<QuestionAnalyse> {
     type: "analyse",
     section: "C",
     univers: "technologique",
-    conceptId: "st-ut-transmission",
+    conceptId: versConceptIdParcours(parcours, "st-ut-transmission"),
     enonce: "Analyse l'objet technique suivant : inspecte chaque étage du mécanisme et réponds aux questions.",
     fonctionGlobale: objet.fonctionGlobale,
     descriptionObjet: `${capitaliser(objet.nom)}. ${contexte}`,
@@ -731,9 +743,9 @@ async function genAnalyseAssemblage(): Promise<QuestionAnalyse> {
 
 const PROBABILITE_ASSEMBLAGE_RICHE = 0.5;
 
-export async function genererQuestionAnalyse(): Promise<QuestionAnalyse> {
+export async function genererQuestionAnalyse(parcours: Parcours = "ST"): Promise<QuestionAnalyse> {
   if (Math.random() < PROBABILITE_ASSEMBLAGE_RICHE) {
-    return genAnalyseAssemblage();
+    return genAnalyseAssemblage(parcours);
   }
-  return genererQuestionAnalyseComposee();
+  return genererQuestionAnalyseComposee(parcours);
 }

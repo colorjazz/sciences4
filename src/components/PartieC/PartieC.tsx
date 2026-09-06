@@ -9,8 +9,10 @@ import Atelier from "../SimulateurTechnologique/Atelier";
 import AssemblagePanel from "./AssemblagePanel";
 import SousQuestionBloc from "../SousQuestionBloc";
 import type { ResultatSousQuestion } from "../../types/question";
+import type { Parcours } from "../../types/curriculum";
 
 interface PartieCProps {
+  parcours: Parcours;
   onRetour: () => void;
 }
 
@@ -33,11 +35,12 @@ function TitreSousSection({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function PartieC({ onRetour }: PartieCProps) {
+export default function PartieC({ parcours, onRetour }: PartieCProps) {
   const [vueSectionC, setVueSectionC] = useState<VueSectionC>("atelier");
-  const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionAnalyse, {
-    autoStart: false,
-  });
+  const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(
+    () => genererQuestionAnalyse(parcours),
+    { autoStart: false }
+  );
   const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
   const [pointsTotal, setPointsTotal] = useState(0);
   const [pointsMaxTotal, setPointsMaxTotal] = useState(0);

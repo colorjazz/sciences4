@@ -21,6 +21,7 @@
  */
 
 import type { QuestionQCM, ChoixQCM, ColonneQCMTableau, OptionQCMTableau } from "../types/question";
+import type { Parcours } from "../types/curriculum";
 import { resoudreLoiOhm } from "../engines/electriciteEngine";
 import {
   classifierPH,
@@ -30,6 +31,7 @@ import {
   formaterEquation,
 } from "../engines/chimieEngine";
 import { genererTrainAleatoire, calculerSensRotation, calculerRapportVitesse } from "../engines/mecaniqueEngine";
+import { resoudreForceGravitationnelle, resoudreVitesse } from "../engines/mecaniqueForcesEngine";
 import { demanderLotMisesEnSituation } from "../ai/geminiClient";
 
 function melanger<T>(items: T[]): T[] {
@@ -55,7 +57,7 @@ interface ScenarioQCM {
 // Univers matériel — Loi d'Ohm (QCM simple)
 // ------------------------------------------------------------
 
-function construireScenarioLoiOhm(): ScenarioQCM {
+function construireScenarioLoiOhm(parcours: Parcours): ScenarioQCM {
   const resistanceOhm = Math.floor(Math.random() * 20 + 5); // 5–24 Ω
   const courantA = Number((Math.random() * 2 + 0.5).toFixed(1)); // 0.5–2.5 A
   const { tensionV } = resoudreLoiOhm({ resistanceOhm, courantA });
@@ -103,7 +105,7 @@ function construireScenarioLoiOhm(): ScenarioQCM {
         type: "qcm",
         section: "A",
         univers: "materiel",
-        conceptId: "st-um-loi-ohm",
+        conceptId: parcours === "ST" ? "st-um-loi-ohm" : "ats-um-loi-ohm",
         enonce: `${miseEnSituation} Quelle est la différence de potentiel (tension) aux bornes de cette résistance ?`,
         choix,
         bonneReponseId,
@@ -212,7 +214,7 @@ function construireScenarioBalancement(): ScenarioQCM {
 // comme le format multi-faits de l'épreuve réelle.
 // ------------------------------------------------------------
 
-function construireScenarioTrainTableau(): ScenarioQCM {
+function construireScenarioTrainTableau(parcours: Parcours): ScenarioQCM {
   const train = genererTrainAleatoire(2);
   const sens = calculerSensRotation(train);
   const dentsA = train.engrenages[0].nombreDents;
@@ -256,7 +258,7 @@ function construireScenarioTrainTableau(): ScenarioQCM {
         type: "qcm-tableau",
         section: "A",
         univers: "technologique",
-        conceptId: "st-ut-transmission",
+        conceptId: parcours === "ST" ? "st-ut-transmission" : "ats-ut-transmission",
         enonce: `${miseEnSituation} La roue A compte ${dentsA} dents et tourne en sens ${train.sensRotationEntree}, engrenée directement avec la roue B qui compte ${dentsB} dents. Parmi les choix ci-dessous, lequel indique correctement le sens de rotation de la roue B et le rapport de vitesse entre A et B ?`,
         colonnes,
         options,
@@ -268,21 +270,153 @@ function construireScenarioTrainTableau(): ScenarioQCM {
 }
 
 // ------------------------------------------------------------
+// Univers matériel — Force gravitationnelle, Fg = mg (QCM simple)
+// Sous-thème "Forces et mouvements", propre au parcours ATS.
+// ------------------------------------------------------------
+
+function construireScenarioForceGravitationnelle(): ScenarioQCM {
+  const masseKg = Number((Math.random() * 140 + 5).toFixed(1)); // 5–145 kg
+  const { forceN } = resoudreForceGravitationnelle({ masseKg });
+  const bonneValeur = Number(forceN.toFixed(1));
+
+  const candidats = [
+    Number((masseKg * 10).toFixed(1)),
+    Number((masseKg / 9.8).toFixed(1)),
+    Number((bonneValeur + masseKg).toFixed(1)),
+    Number((bonneValeur - masseKg).toFixed(1)),
+  ];
+  const valeursRetenues = new Set<number>([bonneValeur]);
+  for (const c of candidats) {
+    if (valeursRetenues.size >= 4) break;
+    if (!valeursRetenues.has(c) && c > 0) valeursRetenues.add(c);
+  }
+  let ecart = 5;
+  while (valeursRetenues.size < 4) {
+    const secours = Number((bonneValeur + ecart).toFixed(1));
+    if (!valeursRetenues.has(secours)) valeursRetenues.add(secours);
+    ecart += 5;
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur la force gravitationnelle exercée sur un objet.",
+    `L'objet décrit doit avoir EXACTEMENT une masse de ${masseKg} kg.`,
+    "Choisis un objet ou une charge réaliste (levage, transport, sport, chantier) — varie ton choix à chaque fois.",
+    "N'effectue AUCUN calcul, ne mentionne aucune force, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choixValeurs = melanger([...valeursRetenues]);
+      const choix: ChoixQCM[] = choixValeurs.map((v, i) => ({
+        id: String.fromCharCode(97 + i),
+        texte: `${v} N`,
+      }));
+      const bonneReponseId = choix[choixValeurs.indexOf(bonneValeur)].id;
+
+      return {
+        id: idAleatoire("qcm-force-grav"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-force",
+        enonce: `${miseEnSituation} Quelle est la force gravitationnelle exercée sur cet objet ? (g = 9,8 N/kg)`,
+        choix,
+        bonneReponseId,
+        explication: `Fg = mg = ${masseKg} × 9,8 = ${bonneValeur} N.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Vitesse constante, v = d/Δt (QCM simple)
+// Sous-thème "Forces et mouvements", propre au parcours ATS.
+// ------------------------------------------------------------
+
+function construireScenarioVitesse(): ScenarioQCM {
+  const distanceM = Math.floor(Math.random() * 480 + 20); // 20–499 m
+  const tempsS = Math.floor(Math.random() * 58 + 2); // 2–59 s
+  const { vitesseMS } = resoudreVitesse({ distanceM, tempsS });
+  const bonneValeur = Number(vitesseMS.toFixed(2));
+
+  const candidats = [
+    Number((tempsS / distanceM).toFixed(2)),
+    Number((distanceM * tempsS).toFixed(2)),
+    Number((bonneValeur + tempsS).toFixed(2)),
+    Number((bonneValeur - tempsS / 4).toFixed(2)),
+  ];
+  const valeursRetenues = new Set<number>([bonneValeur]);
+  for (const c of candidats) {
+    if (valeursRetenues.size >= 4) break;
+    if (!valeursRetenues.has(c) && c > 0) valeursRetenues.add(c);
+  }
+  let ecart = 1;
+  while (valeursRetenues.size < 4) {
+    const secours = Number((bonneValeur + ecart).toFixed(2));
+    if (!valeursRetenues.has(secours)) valeursRetenues.add(secours);
+    ecart++;
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur un déplacement à vitesse constante.",
+    `Le déplacement décrit doit couvrir EXACTEMENT ${distanceM} mètres en EXACTEMENT ${tempsS} secondes.`,
+    "Choisis un contexte réaliste (véhicule, sport, convoyeur industriel) — varie ton choix à chaque fois.",
+    "N'effectue AUCUN calcul, ne mentionne aucune vitesse, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choixValeurs = melanger([...valeursRetenues]);
+      const choix: ChoixQCM[] = choixValeurs.map((v, i) => ({
+        id: String.fromCharCode(97 + i),
+        texte: `${v} m/s`,
+      }));
+      const bonneReponseId = choix[choixValeurs.indexOf(bonneValeur)].id;
+
+      return {
+        id: idAleatoire("qcm-vitesse"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-vitesse-distance-temps",
+        enonce: `${miseEnSituation} Quelle est la vitesse de ce déplacement, en supposant qu'elle est constante ?`,
+        choix,
+        bonneReponseId,
+        explication: `v = d / Δt = ${distanceM} / ${tempsS} = ${bonneValeur} m/s.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
 // Génération par lot — un seul appel réseau pour tout le lot
 // ------------------------------------------------------------
 
-const CONSTRUCTEURS_SCENARIO: (() => ScenarioQCM)[] = [
-  construireScenarioLoiOhm,
-  construireScenarioPh,
-  construireScenarioBalancement,
-  construireScenarioTrainTableau,
+interface ScenarioDisponible {
+  /** Parcours pour lesquels ce scénario est admissible (voir curriculum.ts). */
+  parcours: Parcours[];
+  construire: (parcours: Parcours) => ScenarioQCM;
+}
+
+const CONSTRUCTEURS_SCENARIO: ScenarioDisponible[] = [
+  { parcours: ["ST", "ATS"], construire: construireScenarioLoiOhm },
+  { parcours: ["ST"], construire: () => construireScenarioPh() },
+  { parcours: ["ST"], construire: () => construireScenarioBalancement() },
+  { parcours: ["ST", "ATS"], construire: construireScenarioTrainTableau },
+  { parcours: ["ATS"], construire: () => construireScenarioForceGravitationnelle() },
+  { parcours: ["ATS"], construire: () => construireScenarioVitesse() },
 ];
 
-export async function genererLotQuestionsQCM(nombreQuestions = 15): Promise<QuestionQCM[]> {
+export async function genererLotQuestionsQCM(nombreQuestions = 15, parcours: Parcours = "ST"): Promise<QuestionQCM[]> {
+  const disponibles = CONSTRUCTEURS_SCENARIO.filter((c) => c.parcours.includes(parcours));
   const scenarios: ScenarioQCM[] = [];
   for (let i = 0; i < nombreQuestions; i++) {
-    const constructeur = CONSTRUCTEURS_SCENARIO[Math.floor(Math.random() * CONSTRUCTEURS_SCENARIO.length)];
-    scenarios.push(constructeur());
+    const entree = disponibles[Math.floor(Math.random() * disponibles.length)];
+    scenarios.push(entree.construire(parcours));
   }
 
   const misesEnSituation = await demanderLotMisesEnSituation(scenarios.map((s) => s.promptScenario));

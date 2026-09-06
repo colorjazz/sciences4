@@ -2,16 +2,18 @@ import { useState } from "react";
 import { genererLotQuestionsQCM } from "../../generators/qcmGenerator";
 import { useGenerationLot } from "../../hooks/useGenerationLot";
 import { EtatChargement, EtatErreur } from "../EtatsAsynchrones";
+import type { Parcours } from "../../types/curriculum";
 
 interface PartieAProps {
+  parcours: Parcours;
   onRetour: () => void;
 }
 
 const NOMBRE_QUESTIONS = 15;
 
-export default function PartieA({ onRetour }: PartieAProps) {
+export default function PartieA({ parcours, onRetour }: PartieAProps) {
   const { donnees: questions, chargement, erreur, regenerer } = useGenerationLot(() =>
-    genererLotQuestionsQCM(NOMBRE_QUESTIONS)
+    genererLotQuestionsQCM(NOMBRE_QUESTIONS, parcours)
   );
   const [index, setIndex] = useState(0);
   const [choixSelectionne, setChoixSelectionne] = useState<string | null>(null);

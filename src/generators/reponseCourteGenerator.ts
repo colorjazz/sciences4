@@ -12,6 +12,7 @@
  */
 
 import type { QuestionCourte, SousQuestionNumerique, SousQuestionChoixUnique, OptionChoix } from "../types/question";
+import type { Parcours } from "../types/curriculum";
 import {
   calculerEnergieJoules,
   joulesVersKilowattheures,
@@ -19,6 +20,7 @@ import {
   type UniteTemps,
 } from "../engines/electriciteEngine";
 import { calculerConcentration } from "../engines/chimieEngine";
+import { resoudreForceGravitationnelle } from "../engines/mecaniqueForcesEngine";
 import { demanderMiseEnSituation } from "../ai/geminiClient";
 
 function idAleatoire(prefixe: string): string {
@@ -30,7 +32,7 @@ function idAleatoire(prefixe: string): string {
 // (comme la question 18 : calcul de la puissance, puis de l'énergie)
 // ------------------------------------------------------------
 
-async function genCourtePlaqueSignaletique(): Promise<QuestionCourte> {
+async function genCourtePlaqueSignaletique(parcours: Parcours): Promise<QuestionCourte> {
   const tensionV = Number((Math.random() * 100 + 12).toFixed(1)); // 12–112 V
   const courantA = Number((Math.random() * 4 + 0.5).toFixed(1)); // 0.5–4.5 A
   const { puissanceW } = resoudrePuissance({ tensionV, courantA });
@@ -84,7 +86,7 @@ async function genCourtePlaqueSignaletique(): Promise<QuestionCourte> {
     type: "courte",
     section: "B",
     univers: "materiel",
-    conceptId: "st-um-puissance-energie",
+    conceptId: parcours === "ST" ? "st-um-puissance-energie" : "ats-um-puissance-energie",
     enonce: miseEnSituation,
     sousQuestions: [sousQuestionPuissance, sousQuestionEnergie],
   };
@@ -154,13 +156,86 @@ async function genCourteConcentrationRecommandation(): Promise<QuestionCourte> {
 }
 
 // ------------------------------------------------------------
+// Force gravitationnelle — Fg = mg, puis recommandation selon un seuil
+// (même structure que concentration+recommandation : calcul, puis
+// choix motivé par le résultat). Sous-thème "Forces et mouvements",
+// propre au parcours ATS.
+// ------------------------------------------------------------
+
+async function genCourteForceRecommandation(): Promise<QuestionCourte> {
+  const masseKg = Number((Math.random() * 195 + 5).toFixed(1)); // 5–200 kg
+  const { forceN } = resoudreForceGravitationnelle({ masseKg });
+
+  const SEUIL_BAS = 500;
+  const SEUIL_HAUT = 1500;
+  const options: OptionChoix[] = [
+    { id: "faible", texte: `Force faible (moins de ${SEUIL_BAS} N) : levage manuel sécuritaire.` },
+    { id: "moyenne", texte: `Force moyenne (entre ${SEUIL_BAS} et ${SEUIL_HAUT} N) : aide mécanique recommandée.` },
+    { id: "elevee", texte: `Force élevée (plus de ${SEUIL_HAUT} N) : équipement de levage obligatoire.` },
+  ];
+  const bonneOptionId = forceN < SEUIL_BAS ? "faible" : forceN <= SEUIL_HAUT ? "moyenne" : "elevee";
+
+  const prompt = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le levage d'une charge.",
+    `La situation doit impliquer EXACTEMENT une charge de ${masseKg} kg à soulever.`,
+    "Choisis un contexte réaliste (chantier, entrepôt, déménagement, atelier) — varie ton choix à chaque fois.",
+    "N'effectue AUCUN calcul, ne mentionne aucune force, ne révèle aucune réponse.",
+    'Réponds uniquement avec un JSON strict de la forme {"miseEnSituation": "..."}, sans aucun autre texte.',
+  ].join("\n");
+
+  const miseEnSituation = await demanderMiseEnSituation(prompt);
+
+  const sousQuestionForce: SousQuestionNumerique = {
+    id: "force",
+    typeReponse: "numerique",
+    demandeDemarche: true,
+    enonce: "Quelle est la force gravitationnelle exercée sur cette charge ? (g = 9,8 N/kg)",
+    bareme: { pointsMax: 3 },
+    uniteAttendue: "N",
+    reponseAttendue: Number(forceN.toFixed(2)),
+    toleranceRelative: 0.02,
+    explication: `Fg = mg = ${masseKg} × 9,8 = ${forceN.toFixed(2)} N.`,
+  };
+
+  const sousQuestionRecommandation: SousQuestionChoixUnique = {
+    id: "recommandation",
+    typeReponse: "choix-unique",
+    enonce: "Selon cette force, quelle recommandation de sécurité devrait être faite ?",
+    bareme: { pointsMax: 1 },
+    options,
+    bonneOptionId,
+    explication: `Avec une force gravitationnelle de ${forceN.toFixed(2)} N, la recommandation appropriée est : ${options.find((o) => o.id === bonneOptionId)!.texte}`,
+  };
+
+  return {
+    id: idAleatoire("courte-force"),
+    type: "courte",
+    section: "B",
+    univers: "materiel",
+    conceptId: "ats-um-force",
+    enonce: miseEnSituation,
+    sousQuestions: [sousQuestionForce, sousQuestionRecommandation],
+  };
+}
+
+// ------------------------------------------------------------
 // Sélecteur
 // ------------------------------------------------------------
 
-const GENERATEURS_DISPONIBLES = [genCourtePlaqueSignaletique, genCourteConcentrationRecommandation];
+interface GenerateurDisponible {
+  parcours: Parcours[];
+  generer: (parcours: Parcours) => Promise<QuestionCourte>;
+}
 
-export async function genererQuestionCourte(): Promise<QuestionCourte> {
-  const generateur =
-    GENERATEURS_DISPONIBLES[Math.floor(Math.random() * GENERATEURS_DISPONIBLES.length)];
-  return generateur();
+const GENERATEURS_DISPONIBLES: GenerateurDisponible[] = [
+  { parcours: ["ST", "ATS"], generer: genCourtePlaqueSignaletique },
+  { parcours: ["ST"], generer: () => genCourteConcentrationRecommandation() },
+  { parcours: ["ATS"], generer: () => genCourteForceRecommandation() },
+];
+
+export async function genererQuestionCourte(parcours: Parcours = "ST"): Promise<QuestionCourte> {
+  const disponibles = GENERATEURS_DISPONIBLES.filter((g) => g.parcours.includes(parcours));
+  const entree = disponibles[Math.floor(Math.random() * disponibles.length)];
+  return entree.generer(parcours);
 }

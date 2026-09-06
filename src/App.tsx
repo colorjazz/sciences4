@@ -70,9 +70,9 @@ export default function App() {
         <ModulesPratique parcours={parcours} onSelection={setVue} onRetour={() => setVue("parcours")} />
       )}
 
-      {vue === "A" && <PartieA onRetour={retourModules} />}
-      {vue === "B" && <PartieB onRetour={retourModules} />}
-      {vue === "C" && <PartieC onRetour={retourModules} />}
+      {vue === "A" && parcours && <PartieA parcours={parcours} onRetour={retourModules} />}
+      {vue === "B" && parcours && <PartieB parcours={parcours} onRetour={retourModules} />}
+      {vue === "C" && parcours && <PartieC parcours={parcours} onRetour={retourModules} />}
 
       <nav className="bottom-nav" aria-label="Navigation principale">
         <button

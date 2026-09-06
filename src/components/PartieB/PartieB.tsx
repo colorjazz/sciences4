@@ -4,13 +4,17 @@ import { useGenerationQuestion } from "../../hooks/useGenerationQuestion";
 import { EtatChargement, EtatErreur } from "../EtatsAsynchrones";
 import SousQuestionBloc from "../SousQuestionBloc";
 import type { ResultatSousQuestion } from "../../types/question";
+import type { Parcours } from "../../types/curriculum";
 
 interface PartieBProps {
+  parcours: Parcours;
   onRetour: () => void;
 }
 
-export default function PartieB({ onRetour }: PartieBProps) {
-  const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionCourte);
+export default function PartieB({ parcours, onRetour }: PartieBProps) {
+  const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(() =>
+    genererQuestionCourte(parcours)
+  );
   const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
   const [pointsTotal, setPointsTotal] = useState(0);
   const [pointsMaxTotal, setPointsMaxTotal] = useState(0);
