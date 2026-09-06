@@ -145,11 +145,23 @@ dans `netlify.toml`).
 - [x] **Vue d'ensemble du poteau** (`PoteauCompletViewer.tsx`) : les deux mécanismes composés affichés à leur position réelle sur une structure fixe
 - [x] **Objets techniques composés, générés par l'IA** : chaque question (voie procédurale) invente un objet composé de deux mécanismes qui interagissent
 - [x] Bug corrigé : `useFrame` déplacé dans des composants "Scene" internes rendus à l'intérieur de `<Canvas>` (règle R3F)
-- [x] **L'Atelier** : nouveau module intégrant l'application Atelier des
-  Mécanismes (dépôt séparé `colorjazz/sciences4_3d`, Three.js autonome)
-  en iframe plein écran (`src/components/SimulateurTechnologique/Atelier.tsx`,
+- [x] **L'Atelier** : intègre l'application Atelier des Mécanismes
+  (dépôt séparé `colorjazz/sciences4_3d`, Three.js autonome) en iframe
+  plein écran (`src/components/SimulateurTechnologique/Atelier.tsx`,
   rendu en portail `document.body` — `.app-shell` anime `transform`, ce
   qui en ferait un containing block pour un `position: fixed` interne).
+  Vit DANS la section « Questions d'analyse technologique » (pas un 4e
+  module séparé) : `PartieC.tsx` bascule entre « Analyser un objet » et
+  « L'Atelier » via un contrôle segmenté ; le bouton de retour de
+  l'Atelier est contextuel (`labelRetour`), pas un texte fixe.
+- [x] **Refonte visuelle** : palette chaude crème/encre brune/accent
+  orange inspirée de sciences4_3d (mêmes noms de tokens CSS, valeurs
+  redessinées), échelle de rayons généreuse (10-24px, remplace
+  l'ancien thème « instrument de précision » à rayons serrés),
+  typographie Poppins/Inter. Les trois modules reprennent les noms de
+  section réels de l'épreuve (« Questions à choix multiple » / « à
+  réponse construite » / « d'analyse technologique »), voir
+  `src/utils/libellesPratique.ts`.
 - [x] **Notation à crédit partiel** (Sections B et C) : chaque
   sous-question a son propre barème (1 à 4 points), pas juste bon/mauvais.
   Nouveau moteur déterministe `engines/notationEngine.ts` pour tout ce qui
