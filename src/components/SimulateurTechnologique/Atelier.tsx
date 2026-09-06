@@ -1,9 +1,18 @@
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 interface AtelierProps {
   onRetour: () => void;
   /** Texte du bouton de retour — dépend d'où l'Atelier a été ouvert. */
   labelRetour?: string;
+  /**
+   * Appelé quand l'élève clique la carte "Exercer" dans L'Atelier
+   * (message postMessage envoyé par l'iframe). L'Atelier est une appli
+   * statique sans accès réseau/IA — "Exercer" (génération Gemini +
+   * visionneuses React) vit dans sciences4 ; ce callback referme
+   * l'iframe et bascule Section C sur cet écran à la place.
+   */
+  onExercer?: () => void;
 }
 
 /**
@@ -22,7 +31,17 @@ interface AtelierProps {
  */
 const URL_ATELIER = "https://sciences3d.netlify.app";
 
-export default function Atelier({ onRetour, labelRetour = "← Modules" }: AtelierProps) {
+export default function Atelier({ onRetour, labelRetour = "← Modules", onExercer }: AtelierProps) {
+  useEffect(() => {
+    if (!onExercer) return;
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== new URL(URL_ATELIER).origin) return;
+      if (event.data?.type === "atelier:exercer") onExercer?.();
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [onExercer]);
+
   return createPortal(
     <div className="atelier-fullscreen">
       <div className="atelier-topbar">

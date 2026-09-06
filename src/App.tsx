@@ -126,7 +126,10 @@ function ModulesPratique({
               className="module-card"
               onClick={() => onSelection(s.section)}
             >
-              <h3>{libelle.titre}</h3>
+              <h3>
+                {libelle.logoPrefix && <span className="module-logo-prefix">{libelle.logoPrefix} </span>}
+                {libelle.titre}
+              </h3>
               <p>{libelle.description}</p>
               <span className="card-foot">
                 <span>{s.nombreQuestions} questions</span>

@@ -19,6 +19,12 @@ import type { SectionEpreuve } from "../types/curriculum";
 
 export interface LibellePratique {
   titre: string;
+  /**
+   * Préfixe optionnel affiché en logotype (Poppins très gras + point,
+   * même lettrage que la marque "atelier." de L'Atelier) devant le
+   * titre — ex. "L'atelier." devant "Analyse technologique".
+   */
+  logoPrefix?: string;
   description: string;
   /** clé d'icône, résolue dans le composant (voir ModuleIcon) */
   icone: "eclair" | "regle" | "engrenage";
@@ -38,7 +44,8 @@ export const LIBELLES_MODULES: Record<SectionEpreuve, LibellePratique> = {
     icone: "regle",
   },
   C: {
-    titre: "Questions d'analyse technologique",
+    logoPrefix: "L'atelier.",
+    titre: "Analyse technologique",
     description:
       "Étudie un mécanisme ou un objet et explique son fonctionnement.",
     icone: "engrenage",

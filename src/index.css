@@ -533,6 +533,13 @@ button.ghost:hover {
   margin: 0 0 0.4rem;
 }
 
+/* Lettrage repris de la marque "atelier." (L'Atelier des mécanismes) :
+   Poppins très gras + point, pour signaler que ce module s'ouvre
+   directement dans L'Atelier. */
+.module-logo-prefix {
+  font-weight: 800;
+}
+
 .module-card p {
   margin: 0;
   font-size: 0.87rem;
@@ -582,43 +589,6 @@ button.ghost:hover {
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   padding: 0.3rem 0.9rem;
-}
-
-/* ----------------------------------------------------------
-   Contrôle segmenté (bascule Analyser un objet / L'Atelier)
-   ---------------------------------------------------------- */
-
-.segmented-control {
-  display: inline-flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  margin-bottom: 1.5rem;
-}
-
-.segmented-control button {
-  font: inherit;
-  font-family: var(--font-body);
-  font-weight: 500;
-  font-size: 0.86rem;
-  color: var(--graphite-soft);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-pill);
-  padding: 0.55rem 1.2rem;
-  cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease;
-}
-
-.segmented-control button:hover {
-  color: var(--ink);
-}
-
-.segmented-control button.active {
-  background: var(--ink);
-  color: var(--paper);
 }
 
 /* ----------------------------------------------------------

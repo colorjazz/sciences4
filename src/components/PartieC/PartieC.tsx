@@ -14,7 +14,7 @@ interface PartieCProps {
   onRetour: () => void;
 }
 
-type VueSectionC = "analyse" | "atelier";
+type VueSectionC = "atelier" | "analyse";
 
 function TitreSousSection({ children }: { children: React.ReactNode }) {
   return (
@@ -34,7 +34,7 @@ function TitreSousSection({ children }: { children: React.ReactNode }) {
 }
 
 export default function PartieC({ onRetour }: PartieCProps) {
-  const [vueSectionC, setVueSectionC] = useState<VueSectionC>("analyse");
+  const [vueSectionC, setVueSectionC] = useState<VueSectionC>("atelier");
   const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(genererQuestionAnalyse, {
     autoStart: false,
   });
@@ -60,14 +60,14 @@ export default function PartieC({ onRetour }: PartieCProps) {
   }
 
   if (vueSectionC === "atelier") {
-    return <Atelier onRetour={() => setVueSectionC("analyse")} labelRetour="← Analyser un objet" />;
+    return <Atelier onRetour={onRetour} onExercer={() => setVueSectionC("analyse")} labelRetour="← Modules" />;
   }
 
   return (
     <div className="panel">
       <div className="module-header">
-        <button className="retour-lien" onClick={onRetour} type="button">
-          ← Modules
+        <button className="retour-lien" onClick={() => setVueSectionC("atelier")} type="button">
+          ← L'Atelier
         </button>
         {pointsMaxTotal > 0 && (
           <span className="compteur">
@@ -76,17 +76,8 @@ export default function PartieC({ onRetour }: PartieCProps) {
         )}
       </div>
 
-      <span className="eyebrow-label">Questions d'analyse technologique</span>
+      <span className="eyebrow-label">Exercer</span>
       <h2 style={{ marginBottom: "1.25rem" }}>Étudie cet objet technique</h2>
-
-      <div className="segmented-control">
-        <button type="button" className="active" onClick={() => setVueSectionC("analyse")}>
-          Analyser un objet
-        </button>
-        <button type="button" onClick={() => setVueSectionC("atelier")}>
-          L'Atelier
-        </button>
-      </div>
 
       <div className="question-card">
         {!question && !chargement && !erreur && (
