@@ -67,24 +67,27 @@ export default function ChapitreSelector({
         {[...groupes.entries()].map(([universId, groupe]) => (
           <div className="chapitre-groupe" key={universId}>
             <h3>{groupe.titre}</h3>
-            <div className="chapitre-liste">
+            <div className="chapitre-grille">
               {groupe.items.map((st) => {
                 const dispo = chapitreDisponible(parcours, st.id);
-                const coche = selection.has(st.id);
+                const coche = selection.has(st.id) && dispo;
                 return (
-                  <label
+                  <button
                     key={st.id}
-                    className={`chapitre-item${dispo ? "" : " indisponible"}`}
+                    type="button"
+                    className={`chapitre-carte${coche ? " selected" : ""}${dispo ? "" : " indisponible"}`}
+                    disabled={!dispo}
+                    aria-pressed={coche}
+                    onClick={() => dispo && basculer(st.id)}
                   >
-                    <input
-                      type="checkbox"
-                      checked={coche && dispo}
-                      disabled={!dispo}
-                      onChange={() => dispo && basculer(st.id)}
-                    />
-                    <span>{st.titre}</span>
+                    <span className="chapitre-carte-coche" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12.5 10 17.5 19 7" />
+                      </svg>
+                    </span>
+                    <span className="chapitre-carte-titre">{st.titre}</span>
                     {!dispo && <span className="chapitre-badge">Bientôt disponible</span>}
-                  </label>
+                  </button>
                 );
               })}
             </div>
