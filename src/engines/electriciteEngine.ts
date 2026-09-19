@@ -162,6 +162,56 @@ export function calculerRendementEnergetique(
 }
 
 // ============================================================
+// Loi de la conservation de l'énergie (qualitatif)
+// ------------------------------------------------------------
+// Concept prescrit ST : "Loi de la conservation de l'énergie" —
+// sous-thème Transformation de l'énergie. Portée confirmée dans la
+// Progression des apprentissages : « expliquer qualitativement la loi
+// de la conservation de l'énergie » et « l'appliquer dans divers
+// contextes » — aucun calcul chiffré prescrit à ce concept précis
+// (contrairement au rendement énergétique, juste en dessous), donc
+// une banque d'affirmations vérifiées plutôt qu'un moteur numérique.
+// ============================================================
+
+export interface AffirmationConservationEnergie {
+  id: string;
+  affirmation: string;
+  correcte: boolean;
+  explication: string;
+}
+
+export const BANQUE_CONSERVATION_ENERGIE: AffirmationConservationEnergie[] = [
+  {
+    id: "pas-de-creation",
+    affirmation: "L'énergie ne peut être ni créée ni détruite, seulement transformée d'une forme à une autre.",
+    correcte: true,
+    explication: "C'est exactement l'énoncé de la loi de la conservation de l'énergie : la quantité totale d'énergie reste constante, elle change seulement de forme.",
+  },
+  {
+    id: "ampoule-perte",
+    affirmation: "Dans une ampoule incandescente, une partie de l'énergie électrique consommée se perd complètement et disparaît.",
+    correcte: false,
+    explication: "Faux : rien ne « disparaît ». L'énergie non transformée en lumière est transformée en chaleur — elle change de forme, elle ne s'annule jamais.",
+  },
+  {
+    id: "energie-cinetique-thermique",
+    affirmation: "Quand une voiture freine, son énergie cinétique est transformée en chaleur par les freins, elle n'est pas perdue.",
+    correcte: true,
+    explication: "L'énergie cinétique du mouvement est transformée en énergie thermique par le frottement des freins — la quantité totale d'énergie est conservée.",
+  },
+  {
+    id: "moins-efficace-moins-conservee",
+    affirmation: "Un appareil moins efficace (mauvais rendement) conserve moins bien l'énergie totale que la loi de conservation ne le prévoit.",
+    correcte: false,
+    explication: "Faux : même un appareil peu efficace respecte parfaitement la loi de conservation — son énergie « perdue » est simplement transformée en une forme moins utile (souvent de la chaleur), pas détruite.",
+  },
+];
+
+export function affirmationConservationAleatoire(): AffirmationConservationEnergie {
+  return BANQUE_CONSERVATION_ENERGIE[Math.floor(Math.random() * BANQUE_CONSERVATION_ENERGIE.length)];
+}
+
+// ============================================================
 // Validation de la démarche de l'élève (Partie B)
 // ============================================================
 

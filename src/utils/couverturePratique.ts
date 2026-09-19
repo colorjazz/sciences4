@@ -18,13 +18,43 @@ import type { Parcours, SectionEpreuve } from "../types/curriculum";
 
 export const CHAPITRES_AVEC_CONTENU: Record<Parcours, Record<SectionEpreuve, Set<string>>> = {
   ST: {
-    A: new Set(["electricite", "proprietes-solutions", "transformations-chimiques", "ingenierie-mecanique", "atmosphere"]),
-    B: new Set(["electricite", "proprietes-solutions", "ingenierie-mecanique", "lithosphere", "hydrosphere", "atmosphere"]),
+    A: new Set([
+      "electricite",
+      "proprietes-solutions",
+      "transformations-chimiques",
+      "ingenierie-mecanique",
+      "atmosphere",
+      "cycles-biogeochimiques",
+      "organisation-matiere",
+      "electromagnetisme",
+      "transformation-energie",
+      "ingenierie-electrique",
+      "materiaux-st",
+    ]),
+    B: new Set([
+      "electricite",
+      "proprietes-solutions",
+      "ingenierie-mecanique",
+      "lithosphere",
+      "hydrosphere",
+      "atmosphere",
+      "transformation-energie",
+      "ingenierie-electrique",
+    ]),
     C: new Set(["ingenierie-mecanique"]),
   },
   ATS: {
-    A: new Set(["electricite", "ingenierie-mecanique", "forces-mouvements", "atmosphere"]),
-    B: new Set(["electricite", "forces-mouvements", "ingenierie-mecanique", "lithosphere", "hydrosphere", "atmosphere"]),
+    A: new Set(["electricite", "ingenierie-mecanique", "forces-mouvements", "atmosphere", "transformation-energie", "ingenierie-electrique"]),
+    B: new Set([
+      "electricite",
+      "forces-mouvements",
+      "ingenierie-mecanique",
+      "lithosphere",
+      "hydrosphere",
+      "atmosphere",
+      "transformation-energie",
+      "ingenierie-electrique",
+    ]),
     // Les mécanismes de Section C (engrenages, cames, etc.) sont les mêmes
     // notions d'ingénierie mécanique que pour ST — le générateur est
     // parcours-agnostique (voir versConceptIdParcours dans analyseGenerator.ts).

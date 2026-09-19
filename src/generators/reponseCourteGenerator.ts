@@ -30,6 +30,8 @@ import {
   classifierSalinite,
   type SphereTerreEspace,
 } from "../engines/terreEspaceEngine";
+import { calculerRendementEnergetique } from "../engines/electriciteEngine";
+import { genererResistorAleatoire } from "../engines/ingenierieElectriqueEngine";
 import { demanderMiseEnSituation } from "../ai/geminiClient";
 
 function melanger<T>(items: T[]): T[] {
@@ -427,6 +429,129 @@ async function genCourteSalinite(): Promise<QuestionCourte> {
 }
 
 // ------------------------------------------------------------
+// Rendement énergétique — calcul, puis jugement qualitatif (comme
+// concentration+recommandation). Sous-thème Transformation de
+// l'énergie, formule et grandeurs communes à ST et ATS (Annexes IV/V).
+// ------------------------------------------------------------
+
+async function genCourteRendement(parcours: Parcours): Promise<QuestionCourte> {
+  const energieUtileJ = Math.floor(Math.random() * 700 + 100); // 100–799 J
+  const rendementVoulu = Math.floor(Math.random() * 60 + 20); // 20–79 %
+  const energieConsommeeJ = Math.round(energieUtileJ / (rendementVoulu / 100));
+  const rendement = calculerRendementEnergetique(energieUtileJ, energieConsommeeJ);
+
+  const SEUIL_BAS = 40;
+  const SEUIL_HAUT = 70;
+  const options: OptionChoix[] = [
+    { id: "faible", texte: `Rendement faible (moins de ${SEUIL_BAS} %) : appareil à remplacer ou à améliorer.` },
+    { id: "moyen", texte: `Rendement moyen (entre ${SEUIL_BAS} et ${SEUIL_HAUT} %) : performance acceptable.` },
+    { id: "eleve", texte: `Rendement élevé (plus de ${SEUIL_HAUT} %) : appareil performant.` },
+  ];
+  const bonneOptionId = rendement < SEUIL_BAS ? "faible" : rendement <= SEUIL_HAUT ? "moyen" : "eleve";
+
+  const prompt = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le rendement énergétique d'un appareil.",
+    `L'appareil décrit doit consommer EXACTEMENT ${energieConsommeeJ} joules d'énergie pour produire EXACTEMENT ${energieUtileJ} joules d'énergie utile.`,
+    "Choisis un appareil réaliste (moteur, ampoule, chauffage, outil électrique) — varie ton choix à chaque fois.",
+    "N'effectue AUCUN calcul, ne mentionne aucun rendement, ne révèle aucune réponse.",
+    'Réponds uniquement avec un JSON strict de la forme {"miseEnSituation": "..."}, sans aucun autre texte.',
+  ].join("\n");
+
+  const miseEnSituation = await demanderMiseEnSituation(prompt);
+
+  const sousQuestionRendement: SousQuestionNumerique = {
+    id: "rendement",
+    typeReponse: "numerique",
+    demandeDemarche: true,
+    enonce: "Quel est le rendement énergétique de cet appareil ?",
+    bareme: { pointsMax: 3 },
+    uniteAttendue: "%",
+    reponseAttendue: Number(rendement.toFixed(1)),
+    toleranceRelative: 0.02,
+    explication: `Rendement = (énergie utile / énergie consommée) × 100 = (${energieUtileJ} / ${energieConsommeeJ}) × 100 ≈ ${rendement.toFixed(1)} %.`,
+  };
+
+  const sousQuestionJugement: SousQuestionChoixUnique = {
+    id: "jugement",
+    typeReponse: "choix-unique",
+    enonce: "Selon ce rendement, comment qualifier la performance de cet appareil ?",
+    bareme: { pointsMax: 1 },
+    options,
+    bonneOptionId,
+    explication: `Avec un rendement de ${rendement.toFixed(1)} %, la performance de cet appareil est : ${options.find((o) => o.id === bonneOptionId)!.texte}`,
+  };
+
+  return {
+    id: idAleatoire("courte-rendement"),
+    type: "courte",
+    section: "B",
+    univers: "materiel",
+    conceptId: parcours === "ST" ? "st-um-rendement" : "ats-um-rendement",
+    enonce: miseEnSituation,
+    sousQuestions: [sousQuestionRendement, sousQuestionJugement],
+  };
+}
+
+// ------------------------------------------------------------
+// Résistance par code de couleurs — lecture d'un résistor à 4 bandes.
+// Sous-thème Ingénierie électrique, explicitement partagé ST/ATS (voir
+// Document d'information, Annexe II : ATS précise « résistance et
+// codification »).
+// ------------------------------------------------------------
+
+async function genCourteResistorCodeCouleur(parcours: Parcours): Promise<QuestionCourte> {
+  const resistor = genererResistorAleatoire();
+
+  const options: OptionChoix[] = [
+    { id: "chiffres", texte: "Les deux premières bandes indiquent les deux chiffres significatifs de la valeur." },
+    { id: "tolerance", texte: "Les deux premières bandes indiquent la tolérance (précision) de la résistance." },
+  ];
+
+  const prompt = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur l'identification d'un résistor par son code de couleurs.",
+    "Choisis un contexte réaliste (atelier d'électronique, réparation, projet scolaire) — varie ton choix à chaque fois.",
+    "Ne mentionne aucune couleur ni valeur de résistance, ne révèle aucune réponse.",
+    'Réponds uniquement avec un JSON strict de la forme {"miseEnSituation": "..."}, sans aucun autre texte.',
+  ].join("\n");
+
+  const miseEnSituation = await demanderMiseEnSituation(prompt);
+
+  const sousQuestionValeur: SousQuestionNumerique = {
+    id: "valeur",
+    typeReponse: "numerique",
+    demandeDemarche: true,
+    enonce: `Un résistor porte, dans l'ordre, les bandes de couleur ${resistor.bande1}, ${resistor.bande2} puis ${resistor.bandeMultiplicateur} (multiplicateur). Quelle est la valeur de sa résistance, en ohms ?`,
+    bareme: { pointsMax: 3 },
+    uniteAttendue: "Ω",
+    reponseAttendue: resistor.resistanceOhm,
+    toleranceRelative: 0.001,
+    explication: `Les deux premières bandes (${resistor.bande1}, ${resistor.bande2}) donnent les chiffres significatifs, la troisième (${resistor.bandeMultiplicateur}) donne le multiplicateur : la résistance est de ${resistor.resistanceOhm} Ω.`,
+  };
+
+  const sousQuestionRole: SousQuestionChoixUnique = {
+    id: "role-bandes",
+    typeReponse: "choix-unique",
+    enonce: "Que représentent les deux premières bandes de couleur d'un résistor ?",
+    bareme: { pointsMax: 1 },
+    options,
+    bonneOptionId: "chiffres",
+    explication: "Les deux premières bandes donnent les deux chiffres significatifs de la valeur ; la troisième bande donne le multiplicateur à appliquer.",
+  };
+
+  return {
+    id: idAleatoire("courte-resistor"),
+    type: "courte",
+    section: "B",
+    univers: "technologique",
+    conceptId: parcours === "ST" ? "st-ut-conduction-isolation" : "ats-ut-conduction-isolation",
+    enonce: miseEnSituation,
+    sousQuestions: [sousQuestionValeur, sousQuestionRole],
+  };
+}
+
+// ------------------------------------------------------------
 // Sélecteur — respecte les proportions par univers de
 // STRUCTURE_EPREUVE_ST/ATS (section B), comme la Section A.
 // ------------------------------------------------------------
@@ -462,6 +587,8 @@ const GENERATEURS_DISPONIBLES: GenerateurDisponible[] = [
     },
   },
   { parcours: ["ST"], univers: "terreEspace", sousThemesId: ["hydrosphere"], generer: () => genCourteSalinite() },
+  { parcours: ["ST", "ATS"], univers: "materiel", sousThemesId: ["transformation-energie"], generer: genCourteRendement },
+  { parcours: ["ST", "ATS"], univers: "technologique", sousThemesId: ["ingenierie-electrique"], generer: genCourteResistorCodeCouleur },
 ];
 
 function universVoulu(parcours: Parcours): UniversEvalue | undefined {

@@ -33,7 +33,20 @@ import {
 } from "../engines/chimieEngine";
 import { genererTrainAleatoire, calculerSensRotation, calculerRapportVitesse } from "../engines/mecaniqueEngine";
 import { resoudreForceGravitationnelle, resoudreVitesse } from "../engines/mecaniqueForcesEngine";
-import { BANQUE_GAZ, classifierSystemeMeteo } from "../engines/terreEspaceEngine";
+import { BANQUE_GAZ, classifierSystemeMeteo, phenomeneCarboneAleatoire, phenomenesHorsCarbone } from "../engines/terreEspaceEngine";
+import { elementAleatoire, formaterRepartition } from "../engines/organisationMatiereEngine";
+import { facteurChampAleatoire, scenarioBoussoleAleatoire } from "../engines/electromagnetismeEngine";
+import { calculerRendementEnergetique, affirmationConservationAleatoire } from "../engines/electriciteEngine";
+import {
+  genererResistorAleatoire,
+  sourceAlimentationAleatoire,
+  interrupteurAleatoire,
+  transformationElecAleatoire,
+  BANQUE_SOURCES_ALIMENTATION,
+  BANQUE_INTERRUPTEURS,
+  BANQUE_TRANSFORMATIONS_ELEC,
+} from "../engines/ingenierieElectriqueEngine";
+import { scenarioContrainteAleatoire, choisirMateriauAleatoire, BANQUE_MATERIAUX } from "../engines/materiauxEngine";
 import { demanderLotMisesEnSituation } from "../ai/geminiClient";
 
 function melanger<T>(items: T[]): T[] {
@@ -477,6 +490,573 @@ function construireScenarioCycloneAnticyclone(): ScenarioQCM {
 }
 
 // ------------------------------------------------------------
+// Terre et espace — Cycle du carbone (QCM simple)
+// Sous-thème Cycles biogéochimiques, propre au parcours ST.
+// ------------------------------------------------------------
+
+function construireScenarioCycleCarbone(): ScenarioQCM {
+  const bonPhenomene = phenomeneCarboneAleatoire();
+  const distracteurs = phenomenesHorsCarbone(3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une courte phrase d'introduction (1 phrase), en français québécois neutre,",
+    "qui situe une observation scientifique sur les cycles de la matière dans la nature.",
+    "Reste général (ex. un cours de sciences, une sortie sur le terrain, un documentaire) — ne nomme aucun des phénomènes eux-mêmes.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([bonPhenomene, ...distracteurs]);
+      const choix: ChoixQCM[] = toutes.map((p, i) => ({ id: String.fromCharCode(97 + i), texte: p.texte }));
+      const bonneReponseId = choix[toutes.findIndex((p) => p.id === bonPhenomene.id)].id;
+
+      return {
+        id: idAleatoire("qcm-cycle-carbone"),
+        type: "qcm",
+        section: "A",
+        univers: "terreEspace",
+        conceptId: "st-te-cycle-carbone",
+        enonce: `${miseEnSituation} Lequel de ces phénomènes fait partie du cycle du carbone ?`,
+        choix,
+        bonneReponseId,
+        explication: `${capitaliserQcm(bonPhenomene.texte)} : ce phénomène déplace du carbone entre l'atmosphère, les êtres vivants, l'eau ou les combustibles fossiles, ce qui en fait bien une étape du cycle du carbone.`,
+      };
+    },
+  };
+}
+
+function capitaliserQcm(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Organisation de la matière : modèle de
+// Rutherford-Bohr et familles/périodes (QCM simple)
+// Sous-thème Organisation de la matière, propre au parcours ST.
+// ------------------------------------------------------------
+
+/**
+ * Construit 3 distracteurs textuels garantis distincts entre eux et de la
+ * répartition correcte — les perturbations naturelles (dernière couche ±1,
+ * inversion, permutation) ne suffisent pas toujours pour les éléments
+ * légers à une seule couche (H, He), d'où le repli garanti par compteur.
+ */
+function genererDistracteursRepartition(correcte: number[]): string[] {
+  const correcteStr = correcte.join(", ");
+  const derniere = correcte[correcte.length - 1];
+  const base = correcte.slice(0, -1);
+  const candidats: string[] = [];
+
+  if (correcte.length > 1) candidats.push([...correcte].reverse().join(", "));
+  candidats.push([...base, derniere + 1].join(", "));
+  candidats.push([...base, Math.max(1, derniere - 1)].join(", "));
+  if (correcte.length >= 2) {
+    const permutee = [...correcte];
+    const n = permutee.length;
+    [permutee[n - 1], permutee[n - 2]] = [permutee[n - 2], permutee[n - 1]];
+    candidats.push(permutee.join(", "));
+  }
+  candidats.push([...correcte, 1].join(", "));
+
+  const uniques = new Set<string>();
+  for (const c of candidats) {
+    if (uniques.size >= 3) break;
+    if (c !== correcteStr) uniques.add(c);
+  }
+  let k = 1;
+  while (uniques.size < 3) {
+    const essai = [...base, derniere + 1 + k].join(", ");
+    if (essai !== correcteStr) uniques.add(essai);
+    k++;
+  }
+  return [...uniques].slice(0, 3);
+}
+
+function construireScenarioRutherfordBohr(): ScenarioQCM {
+  const element = elementAleatoire();
+  const bonneRepartition = formaterRepartition(element);
+  const options = [bonneRepartition, ...genererDistracteursRepartition(element.electronsParCouche)];
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur la structure de l'atome.",
+    `L'élément étudié doit être ${element.nom} (symbole ${element.symbole}).`,
+    "Choisis un contexte réaliste (cours de chimie, laboratoire, fiche technique) — varie ton choix à chaque fois.",
+    "Ne mentionne AUCUNE répartition d'électrons, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger(options);
+      const choix: ChoixQCM[] = toutes.map((v, i) => ({ id: String.fromCharCode(97 + i), texte: v }));
+      const bonneReponseId = choix[toutes.indexOf(bonneRepartition)].id;
+
+      return {
+        id: idAleatoire("qcm-rutherford-bohr"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "st-um-rutherford-bohr",
+        enonce: `${miseEnSituation} Cet atome de ${element.nom} (numéro atomique ${element.numeroAtomique}) est représenté à l'aide du modèle de Rutherford-Bohr. Quelle est la répartition de ses électrons par couche, en partant de la couche la plus proche du noyau ?`,
+        choix,
+        bonneReponseId,
+        explication: `Avec ${element.numeroAtomique} électrons à répartir par couches de 2, 8, 8... en partant du noyau, la répartition correcte est ${bonneRepartition}.`,
+      };
+    },
+  };
+}
+
+function construireScenarioFamillesPeriodes(): ScenarioQCM {
+  const element = elementAleatoire();
+  const bonnePeriode = element.periode;
+  const options = new Set<number>([bonnePeriode]);
+  while (options.size < 4) {
+    const p = 1 + Math.floor(Math.random() * 4);
+    options.add(p);
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le tableau périodique des éléments.",
+    `L'élément étudié doit être ${element.nom} (symbole ${element.symbole}, numéro atomique ${element.numeroAtomique}).`,
+    "Choisis un contexte réaliste (cours de chimie, fiche technique, laboratoire) — varie ton choix à chaque fois.",
+    "Ne mentionne AUCUNE période ni famille, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([...options]);
+      const choix: ChoixQCM[] = toutes.map((v, i) => ({ id: String.fromCharCode(97 + i), texte: `Période ${v}` }));
+      const bonneReponseId = choix[toutes.indexOf(bonnePeriode)].id;
+
+      return {
+        id: idAleatoire("qcm-famille-periode"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "st-um-familles-periodes",
+        enonce: `${miseEnSituation} Cet élément (${element.nom}, numéro atomique ${element.numeroAtomique}) possède ${element.electronsParCouche.length} couche(s) électronique(s). À quelle période du tableau périodique appartient-il ?`,
+        choix,
+        bonneReponseId,
+        explication: `Le numéro de la période correspond au nombre de couches électroniques de l'atome : ${element.nom} en a ${element.electronsParCouche.length}, il appartient donc à la période ${bonnePeriode}.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Électromagnétisme (QCM simple)
+// Sous-thème Électromagnétisme, propre au parcours ST.
+// ------------------------------------------------------------
+
+function construireScenarioChampFil(): ScenarioQCM {
+  const bonFacteur = facteurChampAleatoire();
+  // S'assure qu'on tire un facteur qui NE modifie PAS l'intensité, pour contraster.
+  let facteurCorrect = bonFacteur;
+  while (!facteurCorrect.influenceIntensite) facteurCorrect = facteurChampAleatoire();
+  const distracteurs: string[] = [];
+  while (distracteurs.length < 3) {
+    const f = facteurChampAleatoire();
+    if (!f.influenceIntensite && !distracteurs.includes(f.texte)) distracteurs.push(f.texte);
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le champ magnétique produit par un fil électrique.",
+    "Choisis un contexte réaliste (atelier, laboratoire, appareil électrique) — varie ton choix à chaque fois.",
+    "Ne mentionne aucun facteur d'intensité, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([facteurCorrect.texte, ...distracteurs]);
+      const choix: ChoixQCM[] = toutes.map((t, i) => ({ id: String.fromCharCode(97 + i), texte: t }));
+      const bonneReponseId = choix[toutes.indexOf(facteurCorrect.texte)].id;
+
+      return {
+        id: idAleatoire("qcm-champ-fil"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "st-um-champ-fil",
+        enonce: `${miseEnSituation} Un fil est parcouru par un courant électrique, ce qui produit un champ magnétique autour de lui. Parmi les choix suivants, lequel permet de modifier l'intensité de ce champ magnétique ?`,
+        choix,
+        bonneReponseId,
+        explication: `L'intensité du champ magnétique produit autour d'un fil dépend de l'intensité du courant qui y circule et de la nature du fil — pas des autres facteurs proposés.`,
+      };
+    },
+  };
+}
+
+function construireScenarioAttractionRepulsion(): ScenarioQCM {
+  const scenario = scenarioBoussoleAleatoire();
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le magnétisme et l'électricité.",
+    "Choisis un contexte réaliste (laboratoire, atelier d'électricité) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-attraction-repulsion"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "st-um-attraction-repulsion",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Transformation de l'énergie (QCM simple)
+// Sous-thème Transformation de l'énergie. Loi de la conservation
+// propre à ST ; rendement énergétique commun à ST et ATS (formule
+// partagée, voir curriculum.ts FORMULES).
+// ------------------------------------------------------------
+
+function construireScenarioConservationEnergie(): ScenarioQCM {
+  const scenario = affirmationConservationAleatoire();
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur la transformation de l'énergie.",
+    "Choisis un contexte réaliste (maison, atelier, transport) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-conservation-energie"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "st-um-conservation-energie",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+function construireScenarioRendement(parcours: Parcours): ScenarioQCM {
+  const energieUtileJ = Math.floor(Math.random() * 700 + 100); // 100–799 J
+  const rendementVoulu = Math.floor(Math.random() * 50 + 30); // 30–79 %
+  const energieConsommeeJ = Math.round(energieUtileJ / (rendementVoulu / 100));
+  const bonneValeur = Math.round(calculerRendementEnergetique(energieUtileJ, energieConsommeeJ));
+
+  const candidats = [
+    Math.round((energieConsommeeJ / energieUtileJ) * 100),
+    Math.round((energieUtileJ / energieConsommeeJ) * 100) + 10,
+    Math.round((energieUtileJ / energieConsommeeJ) * 100) - 10,
+    energieUtileJ - energieConsommeeJ >= 0 ? Math.round(energieUtileJ - energieConsommeeJ) % 100 : 50,
+  ];
+  const valeursRetenues = new Set<number>([bonneValeur]);
+  for (const c of candidats) {
+    if (valeursRetenues.size >= 4) break;
+    if (!valeursRetenues.has(c) && c > 0 && c <= 100) valeursRetenues.add(c);
+  }
+  let ecart = 3;
+  while (valeursRetenues.size < 4) {
+    const secours = bonneValeur + ecart;
+    if (!valeursRetenues.has(secours) && secours > 0 && secours <= 100) valeursRetenues.add(secours);
+    ecart += 3;
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le rendement énergétique d'un appareil.",
+    `L'appareil décrit doit consommer EXACTEMENT ${energieConsommeeJ} joules d'énergie pour produire EXACTEMENT ${energieUtileJ} joules d'énergie utile.`,
+    "Choisis un appareil réaliste (moteur, ampoule, chauffage) — varie ton choix à chaque fois.",
+    "N'effectue AUCUN calcul, ne mentionne aucun rendement, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choixValeurs = melanger([...valeursRetenues]);
+      const choix: ChoixQCM[] = choixValeurs.map((v, i) => ({ id: String.fromCharCode(97 + i), texte: `${v} %` }));
+      const bonneReponseId = choix[choixValeurs.indexOf(bonneValeur)].id;
+
+      return {
+        id: idAleatoire("qcm-rendement"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: parcours === "ST" ? "st-um-rendement" : "ats-um-rendement",
+        enonce: `${miseEnSituation} Quel est le rendement énergétique de cet appareil ?`,
+        choix,
+        bonneReponseId,
+        explication: `Rendement = (énergie utile / énergie consommée) × 100 = (${energieUtileJ} / ${energieConsommeeJ}) × 100 ≈ ${bonneValeur} %.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers technologique — Ingénierie électrique (QCM simple)
+// Code de couleurs et rendement partagés ST/ATS (voir Document
+// d'information, Annexe II : ATS précise explicitement « résistance
+// et codification »). Alimentation, commande et transformation de
+// l'énergie confirmées pour ST via la Progression des apprentissages
+// — marquées ST seulement en l'absence de la Progression ATS.
+// ------------------------------------------------------------
+
+function construireScenarioResistanceCodeCouleur(parcours: Parcours): ScenarioQCM {
+  const resistor = genererResistorAleatoire();
+  const bonneValeur = resistor.resistanceOhm;
+  const formaterOhms = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)} kΩ` : `${v} Ω`);
+
+  const candidats = [bonneValeur * 10, Math.round(bonneValeur / 10), bonneValeur + 100, Math.round(bonneValeur * 1.5)];
+  const valeursRetenues = new Set<number>([bonneValeur]);
+  for (const c of candidats) {
+    if (valeursRetenues.size >= 4) break;
+    if (!valeursRetenues.has(c) && c > 0) valeursRetenues.add(c);
+  }
+  let ecart = 50;
+  while (valeursRetenues.size < 4) {
+    const secours = bonneValeur + ecart;
+    if (!valeursRetenues.has(secours)) valeursRetenues.add(secours);
+    ecart += 50;
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur l'identification d'un résistor.",
+    "Choisis un contexte réaliste (atelier d'électronique, réparation, projet scolaire) — varie ton choix à chaque fois.",
+    "Ne mentionne aucune couleur ni valeur de résistance, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choixValeurs = melanger([...valeursRetenues]);
+      const choix: ChoixQCM[] = choixValeurs.map((v, i) => ({ id: String.fromCharCode(97 + i), texte: formaterOhms(v) }));
+      const bonneReponseId = choix[choixValeurs.indexOf(bonneValeur)].id;
+
+      return {
+        id: idAleatoire("qcm-resistor"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: parcours === "ST" ? "st-ut-conduction-isolation" : "ats-ut-conduction-isolation",
+        enonce: `${miseEnSituation} Un résistor porte, dans l'ordre, les bandes de couleur ${resistor.bande1}, ${resistor.bande2} puis ${resistor.bandeMultiplicateur} (multiplicateur). Quelle est la valeur de sa résistance ?`,
+        choix,
+        bonneReponseId,
+        explication: `Les deux premières bandes donnent les chiffres significatifs (${resistor.bande1} et ${resistor.bande2}), la troisième donne le multiplicateur (${resistor.bandeMultiplicateur}) : la résistance est de ${formaterOhms(bonneValeur)}.`,
+      };
+    },
+  };
+}
+
+function construireScenarioAlimentation(): ScenarioQCM {
+  const bonneSource = sourceAlimentationAleatoire();
+  const autres = melanger(BANQUE_SOURCES_ALIMENTATION.filter((s) => s.id !== bonneSource.id)).slice(0, 3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les sources d'alimentation électrique.",
+    "Choisis un contexte réaliste (objet technique, laboratoire) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([bonneSource, ...autres]);
+      const choix: ChoixQCM[] = toutes.map((s, i) => ({ id: String.fromCharCode(97 + i), texte: s.nom }));
+      const bonneReponseId = choix[toutes.findIndex((s) => s.id === bonneSource.id)].id;
+
+      return {
+        id: idAleatoire("qcm-alimentation"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "st-ut-alimentation",
+        enonce: `${miseEnSituation} Un objet technique comporte une source de courant qui ${bonneSource.description}. Quelle est cette source ?`,
+        choix,
+        bonneReponseId,
+        explication: `${capitaliserQcm(bonneSource.nom)} ${bonneSource.description} : c'est exactement la fonction d'alimentation décrite.`,
+      };
+    },
+  };
+}
+
+function construireScenarioCommande(): ScenarioQCM {
+  const bonInterrupteur = interrupteurAleatoire();
+  const autres = melanger(BANQUE_INTERRUPTEURS.filter((s) => s.id !== bonInterrupteur.id)).slice(0, 3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les interrupteurs d'un circuit électrique.",
+    "Choisis un contexte réaliste (appareil domestique, atelier) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([bonInterrupteur, ...autres]);
+      const choix: ChoixQCM[] = toutes.map((s, i) => ({ id: String.fromCharCode(97 + i), texte: `Un interrupteur ${s.nom}` }));
+      const bonneReponseId = choix[toutes.findIndex((s) => s.id === bonInterrupteur.id)].id;
+
+      return {
+        id: idAleatoire("qcm-commande"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "st-ut-commande",
+        enonce: `${miseEnSituation} Ce circuit comporte un interrupteur ${bonInterrupteur.description}. De quel type d'interrupteur s'agit-il ?`,
+        choix,
+        bonneReponseId,
+        explication: `Un interrupteur ${bonInterrupteur.nom} est ${bonInterrupteur.description} : c'est la définition même de ce type d'interrupteur.`,
+      };
+    },
+  };
+}
+
+function construireScenarioTransformationEnergieElec(): ScenarioQCM {
+  const bonneTransfo = transformationElecAleatoire();
+  const autres = melanger(BANQUE_TRANSFORMATIONS_ELEC.filter((s) => s.id !== bonneTransfo.id)).slice(0, 3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les composants d'un circuit électrique.",
+    "Choisis un contexte réaliste (appareil domestique, atelier) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([bonneTransfo, ...autres]);
+      const choix: ChoixQCM[] = toutes.map((s, i) => ({ id: String.fromCharCode(97 + i), texte: s.transformation }));
+      const bonneReponseId = choix[toutes.findIndex((s) => s.id === bonneTransfo.id)].id;
+
+      return {
+        id: idAleatoire("qcm-transfo-elec"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "st-ut-transformation-energie-elec",
+        enonce: `${miseEnSituation} Ce circuit comporte ${bonneTransfo.composant}. En quoi cet élément transforme-t-il principalement l'énergie électrique qu'il reçoit ?`,
+        choix,
+        bonneReponseId,
+        explication: `${capitaliserQcm(bonneTransfo.composant)} transforme l'énergie électrique en ${bonneTransfo.transformation}.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers technologique — Matériaux (QCM simple)
+// Sous-thème Matériaux, propre au parcours ST.
+// ------------------------------------------------------------
+
+function construireScenarioContrainte(): ScenarioQCM {
+  const scenario = scenarioContrainteAleatoire();
+  const TOUS_TYPES = ["traction", "compression", "torsion", "flexion", "cisaillement"] as const;
+  const autres = melanger([...TOUS_TYPES].filter((t) => t !== scenario.type)).slice(0, 3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une courte phrase d'introduction (1 phrase), en français québécois neutre,",
+    "qui situe une observation technique sur une pièce mécanique soumise à un effort.",
+    "Reste général — ne nomme AUCUN type de contrainte, ne révèle aucune réponse.",
+  ].join("\n");
+
+  const LIBELLES_CONTRAINTE: Record<string, string> = {
+    traction: "Traction",
+    compression: "Compression",
+    torsion: "Torsion",
+    flexion: "Flexion",
+    cisaillement: "Cisaillement",
+  };
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([scenario.type, ...autres]);
+      const choix: ChoixQCM[] = toutes.map((t, i) => ({ id: String.fromCharCode(97 + i), texte: LIBELLES_CONTRAINTE[t] }));
+      const bonneReponseId = choix[toutes.indexOf(scenario.type)].id;
+
+      return {
+        id: idAleatoire("qcm-contrainte"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "st-ut-contraintes",
+        enonce: `${miseEnSituation} Situation observée : ${scenario.situation}. Quel type de contrainte cette pièce subit-elle principalement ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+function construireScenarioProprieteMateriau(): ScenarioQCM {
+  const bonMateriau = choisirMateriauAleatoire();
+  const autres = melanger(BANQUE_MATERIAUX.filter((m) => m.id !== bonMateriau.id)).slice(0, 3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une courte phrase d'introduction (1 phrase), en français québécois neutre,",
+    "qui situe le choix d'un matériau pour fabriquer une pièce technique.",
+    "Reste général — ne nomme AUCUNE propriété de matériau, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const optionsBonnes = bonMateriau.proprietesCles[0];
+      const optionsAutres = autres.map((m) => m.proprietesCles[0]);
+      const toutes = melanger([optionsBonnes, ...optionsAutres]);
+      const choix: ChoixQCM[] = toutes.map((t, i) => ({ id: String.fromCharCode(97 + i), texte: capitaliserQcm(t) }));
+      const bonneReponseId = choix[toutes.indexOf(optionsBonnes)].id;
+
+      return {
+        id: idAleatoire("qcm-propriete-materiau"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "st-ut-proprietes-mecaniques",
+        enonce: `${miseEnSituation} Pour ${bonMateriau.exempleUsage}, on choisit le ${bonMateriau.nom}. Quelle propriété de ce matériau justifie le mieux ce choix ?`,
+        choix,
+        bonneReponseId,
+        explication: `${capitaliserQcm(bonMateriau.nom)} est utilisé pour ${bonMateriau.exempleUsage} notamment parce qu'il est ${bonMateriau.proprietesCles.join(", ")}.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
 // Génération par lot — un seul appel réseau pour tout le lot
 // ------------------------------------------------------------
 
@@ -498,6 +1078,19 @@ const CONSTRUCTEURS_SCENARIO: ScenarioDisponible[] = [
   { parcours: ["ATS"], univers: "materiel", sousThemeId: "forces-mouvements", construire: () => construireScenarioVitesse() },
   { parcours: ["ST"], univers: "terreEspace", sousThemeId: "atmosphere", construire: () => construireScenarioEffetDeSerre() },
   { parcours: ["ATS"], univers: "terreEspace", sousThemeId: "atmosphere", construire: () => construireScenarioCycloneAnticyclone() },
+  { parcours: ["ST"], univers: "terreEspace", sousThemeId: "cycles-biogeochimiques", construire: () => construireScenarioCycleCarbone() },
+  { parcours: ["ST"], univers: "materiel", sousThemeId: "organisation-matiere", construire: () => construireScenarioRutherfordBohr() },
+  { parcours: ["ST"], univers: "materiel", sousThemeId: "organisation-matiere", construire: () => construireScenarioFamillesPeriodes() },
+  { parcours: ["ST"], univers: "materiel", sousThemeId: "electromagnetisme", construire: () => construireScenarioChampFil() },
+  { parcours: ["ST"], univers: "materiel", sousThemeId: "electromagnetisme", construire: () => construireScenarioAttractionRepulsion() },
+  { parcours: ["ST"], univers: "materiel", sousThemeId: "transformation-energie", construire: () => construireScenarioConservationEnergie() },
+  { parcours: ["ST", "ATS"], univers: "materiel", sousThemeId: "transformation-energie", construire: construireScenarioRendement },
+  { parcours: ["ST", "ATS"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: construireScenarioResistanceCodeCouleur },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: () => construireScenarioAlimentation() },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: () => construireScenarioCommande() },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: () => construireScenarioTransformationEnergieElec() },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "materiaux-st", construire: () => construireScenarioContrainte() },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "materiaux-st", construire: () => construireScenarioProprieteMateriau() },
 ];
 
 /**

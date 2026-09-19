@@ -12,7 +12,8 @@ export type CategorieMateriau =
   | "metal-non-ferreux"
   | "thermoplastique"
   | "thermodurcissable"
-  | "bois";
+  | "bois"
+  | "ceramique";
 
 export interface Materiau {
   id: string;
@@ -74,6 +75,18 @@ export const BANQUE_MATERIAUX: Materiau[] = [
     ],
     exempleUsage: "manches d'outils, meubles",
   },
+  {
+    id: "ceramique",
+    nom: "céramique",
+    categorie: "ceramique",
+    proprietesCles: [
+      "bonne résistance à la chaleur",
+      "grande dureté",
+      "bonne résistance à l'usure",
+      "cassante (faible résistance aux chocs)",
+    ],
+    exempleUsage: "revêtement intérieur des fours",
+  },
 ];
 
 export function choisirMateriauAleatoire(): Materiau {
@@ -82,4 +95,57 @@ export function choisirMateriauAleatoire(): Materiau {
 
 export function trouverMateriauParId(id: string): Materiau | undefined {
   return BANQUE_MATERIAUX.find((m) => m.id === id);
+}
+
+// ============================================================
+// Contraintes mécaniques — traction, compression, torsion, flexion,
+// cisaillement (concept prescrit "Contraintes", portée confirmée
+// dans la Progression des apprentissages : les cinq types sont
+// prescrits pour ST en 4e secondaire).
+// ============================================================
+
+export type TypeContrainte = "traction" | "compression" | "torsion" | "flexion" | "cisaillement";
+
+export interface ScenarioContrainte {
+  id: string;
+  situation: string;
+  type: TypeContrainte;
+  explication: string;
+}
+
+export const BANQUE_CONTRAINTES: ScenarioContrainte[] = [
+  {
+    id: "corde-tiree",
+    situation: "une corde d'escalade tirée par le grimpeur à ses deux extrémités",
+    type: "traction",
+    explication: "Les deux extrémités sont tirées en sens opposés vers l'extérieur : la pièce s'étire, c'est de la traction.",
+  },
+  {
+    id: "poteau-charge",
+    situation: "un poteau de bois qui supporte le poids d'un toit",
+    type: "compression",
+    explication: "Le poteau est écrasé par une charge dirigée vers l'intérieur, dans le sens de sa longueur : c'est de la compression.",
+  },
+  {
+    id: "tournevis",
+    situation: "la tige d'un tournevis qu'on tord pour visser une vis coincée",
+    type: "torsion",
+    explication: "La tige subit une rotation en sens opposé à ses deux extrémités : c'est de la torsion.",
+  },
+  {
+    id: "tremplin",
+    situation: "un tremplin de piscine plié vers le bas sous le poids d'un plongeur",
+    type: "flexion",
+    explication: "La pièce se courbe sous une charge perpendiculaire à sa longueur : c'est de la flexion.",
+  },
+  {
+    id: "ciseaux",
+    situation: "une feuille de papier coupée par des ciseaux",
+    type: "cisaillement",
+    explication: "Deux forces opposées glissent l'une contre l'autre de part et d'autre d'un même plan : c'est du cisaillement.",
+  },
+];
+
+export function scenarioContrainteAleatoire(): ScenarioContrainte {
+  return BANQUE_CONTRAINTES[Math.floor(Math.random() * BANQUE_CONTRAINTES.length)];
 }

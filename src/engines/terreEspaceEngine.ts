@@ -99,3 +99,45 @@ export function classifierSalinite(saliniteGL: number): ClasseSalinite {
   if (saliniteGL <= 30) return "saumatre";
   return "salee";
 }
+
+// ------------------------------------------------------------
+// ST — Cycle du carbone (sous-thème Cycles biogéochimiques).
+// Portée confirmée dans la Progression des apprentissages : décrire
+// des transformations liées à la circulation du carbone (exemples
+// officiels : photosynthèse, décomposition des végétaux, dissolution
+// dans l'eau, combustion des combustibles fossiles). Les distracteurs
+// viennent volontairement d'autres cycles biogéochimiques (azote,
+// phosphore) documentés juste à côté dans le même document — pas de
+// l'invention, mais pas non plus des concepts prescrits pour ST.
+// ------------------------------------------------------------
+
+export interface PhenomeneBiogeochimique {
+  id: string;
+  texte: string;
+  cycle: "carbone" | "azote" | "phosphore";
+}
+
+export const BANQUE_PHENOMENES_BIOGEOCHIMIQUES: PhenomeneBiogeochimique[] = [
+  { id: "photosynthese", texte: "la photosynthèse, qui fixe le carbone atmosphérique dans les plantes", cycle: "carbone" },
+  { id: "decomposition-vegetaux", texte: "la décomposition des végétaux, qui relâche le carbone qu'ils contenaient", cycle: "carbone" },
+  { id: "dissolution-co2", texte: "la dissolution du dioxyde de carbone dans l'eau des océans", cycle: "carbone" },
+  { id: "combustion-fossiles", texte: "la combustion des combustibles fossiles, qui relâche le carbone qu'ils contenaient", cycle: "carbone" },
+  { id: "fixation-azote", texte: "la fixation de l'azote atmosphérique par certaines bactéries du sol", cycle: "azote" },
+  { id: "nitrification", texte: "la nitrification, qui transforme l'ammoniac du sol en nitrates", cycle: "azote" },
+  { id: "erosion-roches", texte: "l'érosion des roches, qui libère le phosphore qu'elles contiennent", cycle: "phosphore" },
+];
+
+export function phenomeneCarboneAleatoire(): PhenomeneBiogeochimique {
+  const phenomenes = BANQUE_PHENOMENES_BIOGEOCHIMIQUES.filter((p) => p.cycle === "carbone");
+  return phenomenes[Math.floor(Math.random() * phenomenes.length)];
+}
+
+export function phenomenesHorsCarbone(n: number): PhenomeneBiogeochimique[] {
+  const autres = [...BANQUE_PHENOMENES_BIOGEOCHIMIQUES.filter((p) => p.cycle !== "carbone")];
+  const resultat: PhenomeneBiogeochimique[] = [];
+  for (let i = 0; i < n && autres.length > 0; i++) {
+    const idx = Math.floor(Math.random() * autres.length);
+    resultat.push(autres.splice(idx, 1)[0]);
+  }
+  return resultat;
+}
