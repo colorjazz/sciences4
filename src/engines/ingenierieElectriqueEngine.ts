@@ -98,6 +98,58 @@ export function interrupteurAleatoire(): TypeInterrupteur {
 }
 
 // ============================================================
+// Fonction de commande — distinctions unipolaire/bipolaire et
+// unidirectionnel/bidirectionnel, propres au parcours ATS (portée
+// confirmée dans sa Progression des apprentissages, contenu 4e
+// secondaire spécifique à ATS — absent du même degré de détail pour
+// ST, qui reste au niveau des types d'interrupteurs nommés).
+// ============================================================
+
+export interface AffirmationCommandeAts {
+  id: string;
+  affirmation: string;
+  correcte: boolean;
+  explication: string;
+}
+
+export const BANQUE_COMMANDE_ATS: AffirmationCommandeAts[] = [
+  {
+    id: "unipolaire-un-pole",
+    affirmation: "Un interrupteur unipolaire contrôle le passage du courant sur un seul pôle (un seul fil) du circuit.",
+    correcte: true,
+    explication: "« Uni-polaire » signifie littéralement « un seul pôle » : ce type d'interrupteur ne coupe qu'un seul des conducteurs du circuit.",
+  },
+  {
+    id: "bipolaire-deux-poles",
+    affirmation: "Un interrupteur bipolaire contrôle simultanément les deux pôles (les deux fils) d'un circuit.",
+    correcte: true,
+    explication: "« Bi-polaire » signifie « deux pôles » : ce type d'interrupteur coupe les deux conducteurs du circuit en même temps.",
+  },
+  {
+    id: "unidirectionnel-un-sens",
+    affirmation: "Un interrupteur unidirectionnel ne laisse passer le courant que dans un seul sens.",
+    correcte: true,
+    explication: "« Uni-directionnel » signifie qu'il ne fonctionne (ou ne conduit) que dans une seule direction du courant.",
+  },
+  {
+    id: "bidirectionnel-un-seul-sens",
+    affirmation: "Un interrupteur bidirectionnel, comme son nom l'indique, ne fonctionne que dans un seul sens.",
+    correcte: false,
+    explication: "Faux : « bi-directionnel » signifie qu'il fonctionne dans les DEUX sens — c'est l'unidirectionnel qui se limite à un seul sens.",
+  },
+  {
+    id: "unipolaire-deux-poles",
+    affirmation: "Un interrupteur unipolaire contrôle les deux pôles d'un circuit à la fois.",
+    correcte: false,
+    explication: "Faux : c'est la définition de l'interrupteur bipolaire. L'unipolaire ne contrôle qu'un seul pôle.",
+  },
+];
+
+export function affirmationCommandeAtsAleatoire(): AffirmationCommandeAts {
+  return BANQUE_COMMANDE_ATS[Math.floor(Math.random() * BANQUE_COMMANDE_ATS.length)];
+}
+
+// ============================================================
 // Fonction de transformation de l'énergie (dans un circuit)
 // ============================================================
 

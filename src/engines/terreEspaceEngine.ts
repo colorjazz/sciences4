@@ -141,3 +141,42 @@ export function phenomenesHorsCarbone(n: number): PhenomeneBiogeochimique[] {
   }
   return resultat;
 }
+
+// ------------------------------------------------------------
+// ATS — Système Terre-Lune (sous-thème Espace, propre au parcours
+// ATS). Portée confirmée dans la Progression des apprentissages :
+// « décrire le phénomène des marées à l'aide de l'effet
+// gravitationnel du système Terre-Lune ».
+// ------------------------------------------------------------
+
+export interface AffirmationMaree {
+  id: string;
+  affirmation: string;
+  correcte: boolean;
+  explication: string;
+}
+
+export const BANQUE_MAREES: AffirmationMaree[] = [
+  {
+    id: "marees-gravite-lune",
+    affirmation: "Les marées hautes et basses résultent principalement de l'effet gravitationnel exercé par la Lune sur les océans.",
+    correcte: true,
+    explication: "L'attraction gravitationnelle de la Lune (et, dans une moindre mesure, du Soleil) déforme la masse d'eau des océans, créant le cycle des marées.",
+  },
+  {
+    id: "marees-vent-seulement",
+    affirmation: "Les marées sont causées uniquement par le vent qui pousse l'eau vers les côtes.",
+    correcte: false,
+    explication: "Faux : le vent influence les vagues, mais le cycle régulier des marées vient de l'effet gravitationnel du système Terre-Lune, pas du vent.",
+  },
+  {
+    id: "marees-soleil-lune",
+    affirmation: "Le Soleil, en plus de la Lune, contribue aussi à l'effet gravitationnel qui cause les marées.",
+    correcte: true,
+    explication: "Bien que la Lune ait l'effet dominant (elle est beaucoup plus proche), le Soleil contribue aussi à l'attraction gravitationnelle responsable des marées.",
+  },
+];
+
+export function affirmationMareeAleatoire(): AffirmationMaree {
+  return BANQUE_MAREES[Math.floor(Math.random() * BANQUE_MAREES.length)];
+}

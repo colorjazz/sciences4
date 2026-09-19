@@ -32,21 +32,48 @@ import {
   formaterEquation,
 } from "../engines/chimieEngine";
 import { genererTrainAleatoire, calculerSensRotation, calculerRapportVitesse } from "../engines/mecaniqueEngine";
-import { resoudreForceGravitationnelle, resoudreVitesse } from "../engines/mecaniqueForcesEngine";
-import { BANQUE_GAZ, classifierSystemeMeteo, phenomeneCarboneAleatoire, phenomenesHorsCarbone } from "../engines/terreEspaceEngine";
+import {
+  resoudreForceGravitationnelle,
+  resoudreVitesse,
+  exempleTypeForceAleatoire,
+  BANQUE_TYPES_FORCES,
+  affirmationEquilibreAleatoire,
+} from "../engines/mecaniqueForcesEngine";
+import {
+  BANQUE_GAZ,
+  classifierSystemeMeteo,
+  phenomeneCarboneAleatoire,
+  phenomenesHorsCarbone,
+  affirmationMareeAleatoire,
+} from "../engines/terreEspaceEngine";
 import { elementAleatoire, formaterRepartition } from "../engines/organisationMatiereEngine";
-import { facteurChampAleatoire, scenarioBoussoleAleatoire } from "../engines/electromagnetismeEngine";
+import {
+  facteurChampAleatoire,
+  scenarioBoussoleAleatoire,
+  facteurSolenoideAleatoire,
+  moyenInductionAleatoire,
+} from "../engines/electromagnetismeEngine";
 import { calculerRendementEnergetique, affirmationConservationAleatoire } from "../engines/electriciteEngine";
 import {
   genererResistorAleatoire,
   sourceAlimentationAleatoire,
   interrupteurAleatoire,
   transformationElecAleatoire,
+  affirmationCommandeAtsAleatoire,
   BANQUE_SOURCES_ALIMENTATION,
   BANQUE_INTERRUPTEURS,
   BANQUE_TRANSFORMATIONS_ELEC,
 } from "../engines/ingenierieElectriqueEngine";
-import { scenarioContrainteAleatoire, choisirMateriauAleatoire, BANQUE_MATERIAUX } from "../engines/materiauxEngine";
+import {
+  scenarioContrainteAleatoire,
+  choisirMateriauAleatoire,
+  traitementDegradationAleatoire,
+  BANQUE_MATERIAUX,
+} from "../engines/materiauxEngine";
+import { affirmationOxydationAleatoire, affirmationCombustionAleatoire } from "../engines/transformationsChimiquesAtsEngine";
+import { affirmationArchimedeAleatoire, affirmationPascalAleatoire, affirmationBernoulliAleatoire } from "../engines/fluidesEngine";
+import { affirmationCotationAleatoire, developpementAleatoire } from "../engines/langageDesLignesEngine";
+import { operationFabricationAleatoire, BANQUE_OPERATIONS_FABRICATION } from "../engines/fabricationEngine";
 import { demanderLotMisesEnSituation } from "../ai/geminiClient";
 
 function melanger<T>(items: T[]): T[] {
@@ -652,7 +679,7 @@ function construireScenarioFamillesPeriodes(): ScenarioQCM {
 // Sous-thème Électromagnétisme, propre au parcours ST.
 // ------------------------------------------------------------
 
-function construireScenarioChampFil(): ScenarioQCM {
+function construireScenarioChampFil(parcours: Parcours): ScenarioQCM {
   const bonFacteur = facteurChampAleatoire();
   // S'assure qu'on tire un facteur qui NE modifie PAS l'intensité, pour contraster.
   let facteurCorrect = bonFacteur;
@@ -682,7 +709,7 @@ function construireScenarioChampFil(): ScenarioQCM {
         type: "qcm",
         section: "A",
         univers: "materiel",
-        conceptId: "st-um-champ-fil",
+        conceptId: parcours === "ST" ? "st-um-champ-fil" : "ats-um-champ-fil",
         enonce: `${miseEnSituation} Un fil est parcouru par un courant électrique, ce qui produit un champ magnétique autour de lui. Parmi les choix suivants, lequel permet de modifier l'intensité de ce champ magnétique ?`,
         choix,
         bonneReponseId,
@@ -692,7 +719,7 @@ function construireScenarioChampFil(): ScenarioQCM {
   };
 }
 
-function construireScenarioAttractionRepulsion(): ScenarioQCM {
+function construireScenarioAttractionRepulsion(parcours: Parcours): ScenarioQCM {
   const scenario = scenarioBoussoleAleatoire();
 
   const promptScenario = [
@@ -716,7 +743,7 @@ function construireScenarioAttractionRepulsion(): ScenarioQCM {
         type: "qcm",
         section: "A",
         univers: "materiel",
-        conceptId: "st-um-attraction-repulsion",
+        conceptId: parcours === "ST" ? "st-um-attraction-repulsion" : "ats-um-attraction-repulsion",
         enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
         choix,
         bonneReponseId,
@@ -877,7 +904,7 @@ function construireScenarioResistanceCodeCouleur(parcours: Parcours): ScenarioQC
   };
 }
 
-function construireScenarioAlimentation(): ScenarioQCM {
+function construireScenarioAlimentation(parcours: Parcours): ScenarioQCM {
   const bonneSource = sourceAlimentationAleatoire();
   const autres = melanger(BANQUE_SOURCES_ALIMENTATION.filter((s) => s.id !== bonneSource.id)).slice(0, 3);
 
@@ -900,7 +927,7 @@ function construireScenarioAlimentation(): ScenarioQCM {
         type: "qcm",
         section: "A",
         univers: "technologique",
-        conceptId: "st-ut-alimentation",
+        conceptId: parcours === "ST" ? "st-ut-alimentation" : "ats-ut-alimentation",
         enonce: `${miseEnSituation} Un objet technique comporte une source de courant qui ${bonneSource.description}. Quelle est cette source ?`,
         choix,
         bonneReponseId,
@@ -943,7 +970,7 @@ function construireScenarioCommande(): ScenarioQCM {
   };
 }
 
-function construireScenarioTransformationEnergieElec(): ScenarioQCM {
+function construireScenarioTransformationEnergieElec(parcours: Parcours): ScenarioQCM {
   const bonneTransfo = transformationElecAleatoire();
   const autres = melanger(BANQUE_TRANSFORMATIONS_ELEC.filter((s) => s.id !== bonneTransfo.id)).slice(0, 3);
 
@@ -966,7 +993,7 @@ function construireScenarioTransformationEnergieElec(): ScenarioQCM {
         type: "qcm",
         section: "A",
         univers: "technologique",
-        conceptId: "st-ut-transformation-energie-elec",
+        conceptId: parcours === "ST" ? "st-ut-transformation-energie-elec" : "ats-ut-transformation-energie-elec",
         enonce: `${miseEnSituation} Ce circuit comporte ${bonneTransfo.composant}. En quoi cet élément transforme-t-il principalement l'énergie électrique qu'il reçoit ?`,
         choix,
         bonneReponseId,
@@ -977,11 +1004,420 @@ function construireScenarioTransformationEnergieElec(): ScenarioQCM {
 }
 
 // ------------------------------------------------------------
-// Univers technologique — Matériaux (QCM simple)
-// Sous-thème Matériaux, propre au parcours ST.
+// Univers technologique — Fonction de commande ATS (unipolaire/
+// bipolaire, unidirectionnel/bidirectionnel) : contenu 4e secondaire
+// spécifique à ATS, distinct du contenu ST (types d'interrupteurs).
 // ------------------------------------------------------------
 
-function construireScenarioContrainte(): ScenarioQCM {
+function construireScenarioCommandeAts(): ScenarioQCM {
+  const scenario = affirmationCommandeAtsAleatoire();
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les interrupteurs d'un circuit électrique.",
+    "Choisis un contexte réaliste (appareil domestique, atelier, véhicule) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-commande-ats"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "ats-ut-commande",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Transformations chimiques ATS (oxydation,
+// combustion). Distinct de chimieEngine.ts (ST), plus vaste.
+// ------------------------------------------------------------
+
+function construireScenarioOxydation(): ScenarioQCM {
+  const scenario = affirmationOxydationAleatoire();
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les transformations chimiques.",
+    "Choisis un contexte réaliste (atelier, extérieur, entretien d'objets) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-oxydation"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-oxydation",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+function construireScenarioCombustionAts(): ScenarioQCM {
+  const scenario = affirmationCombustionAleatoire();
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur la combustion.",
+    "Choisis un contexte réaliste (atelier, extérieur, sécurité incendie) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-combustion-ats"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-combustion",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Fluides (Archimède, Pascal, Bernoulli), propre
+// au parcours ATS.
+// ------------------------------------------------------------
+
+function construireScenarioArchimede(): ScenarioQCM {
+  const scenario = affirmationArchimedeAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les fluides et la flottabilité.",
+    "Choisis un contexte réaliste (navigation, piscine, laboratoire) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-archimede"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-archimede",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+function construireScenarioPascal(): ScenarioQCM {
+  const scenario = affirmationPascalAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les systèmes hydrauliques ou pneumatiques.",
+    "Choisis un contexte réaliste (atelier mécanique, chantier, équipement) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-pascal"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-pascal",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+function construireScenarioBernoulli(): ScenarioQCM {
+  const scenario = affirmationBernoulliAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur l'écoulement des fluides.",
+    "Choisis un contexte réaliste (aviation, ventilation, sport) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-bernoulli"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-bernoulli",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Solénoïde et induction électromagnétique
+// (concepts ATS uniquement).
+// ------------------------------------------------------------
+
+function construireScenarioSolenoide(): ScenarioQCM {
+  let facteurCorrect = facteurSolenoideAleatoire();
+  while (!facteurCorrect.influenceIntensite) facteurCorrect = facteurSolenoideAleatoire();
+  const distracteurs: string[] = [];
+  while (distracteurs.length < 3) {
+    const f = facteurSolenoideAleatoire();
+    if (!f.influenceIntensite && !distracteurs.includes(f.texte)) distracteurs.push(f.texte);
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 à 2 phrases), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le champ magnétique produit par un solénoïde.",
+    "Choisis un contexte réaliste (atelier, laboratoire, appareil électromécanique) — varie ton choix à chaque fois.",
+    "Ne mentionne aucun facteur d'intensité, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([facteurCorrect.texte, ...distracteurs]);
+      const choix: ChoixQCM[] = toutes.map((t, i) => ({ id: String.fromCharCode(97 + i), texte: t }));
+      const bonneReponseId = choix[toutes.indexOf(facteurCorrect.texte)].id;
+
+      return {
+        id: idAleatoire("qcm-solenoide"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-champ-solenoide",
+        enonce: `${miseEnSituation} Un solénoïde (bobine de fil enroulé) est parcouru par un courant électrique. Parmi les choix suivants, lequel permet de modifier l'intensité du champ magnétique qu'il produit ?`,
+        choix,
+        bonneReponseId,
+        explication: `L'intensité du champ magnétique produit par un solénoïde dépend de la nature de son noyau, du nombre de spires et de l'intensité du courant — pas des autres facteurs proposés.`,
+      };
+    },
+  };
+}
+
+function construireScenarioInduction(): ScenarioQCM {
+  const bonMoyen = (() => {
+    let m = moyenInductionAleatoire();
+    while (!m.induitCourant) m = moyenInductionAleatoire();
+    return m;
+  })();
+  const distracteurs: string[] = [];
+  while (distracteurs.length < 3) {
+    const m = moyenInductionAleatoire();
+    if (!m.induitCourant && !distracteurs.includes(m.texte)) distracteurs.push(m.texte);
+  }
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur l'induction électromagnétique.",
+    "Choisis un contexte réaliste (laboratoire, atelier) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([bonMoyen.texte, ...distracteurs]);
+      const choix: ChoixQCM[] = toutes.map((t, i) => ({ id: String.fromCharCode(97 + i), texte: capitaliserQcm(t) }));
+      const bonneReponseId = choix[toutes.indexOf(bonMoyen.texte)].id;
+
+      return {
+        id: idAleatoire("qcm-induction"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-induction",
+        enonce: `${miseEnSituation} Un fil est placé à proximité d'un champ magnétique. Laquelle de ces actions permet d'y induire un courant électrique ?`,
+        choix,
+        bonneReponseId,
+        explication: `Un courant électrique est induit dans un fil lorsque le champ magnétique qui le traverse VARIE — que ce soit en déplaçant un aimant ou en faisant varier l'intensité du champ. Un champ immobile et constant n'induit aucun courant.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Terre et espace — Système Terre-Lune (marées), propre au parcours ATS.
+// ------------------------------------------------------------
+
+function construireScenarioMaree(): ScenarioQCM {
+  const scenario = affirmationMareeAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur les marées.",
+    "Choisis un contexte réaliste (côte, port, observation) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-maree"),
+        type: "qcm",
+        section: "A",
+        univers: "terreEspace",
+        conceptId: "ats-te-terre-lune",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers matériel — Types de forces et équilibre de deux forces,
+// propres au parcours ATS (sous-thème Forces et mouvements).
+// ------------------------------------------------------------
+
+function construireScenarioTypesForces(): ScenarioQCM {
+  const bonExemple = exempleTypeForceAleatoire();
+  const autres = melanger(BANQUE_TYPES_FORCES.filter((f) => f.id !== bonExemple.id)).slice(0, 3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une courte phrase d'introduction (1 phrase), en français québécois neutre,",
+    "qui situe une observation sur un objet technique ou une situation physique.",
+    "Reste général — ne nomme AUCUN type de force, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([bonExemple, ...autres]);
+      const choix: ChoixQCM[] = toutes.map((f, i) => ({ id: String.fromCharCode(97 + i), texte: capitaliserQcm(f.typeForce) }));
+      const bonneReponseId = choix[toutes.findIndex((f) => f.id === bonExemple.id)].id;
+
+      return {
+        id: idAleatoire("qcm-types-forces"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-types-forces",
+        enonce: `${miseEnSituation} Situation observée : ${bonExemple.situation}. Quel type de force est principalement en jeu ici ?`,
+        choix,
+        bonneReponseId,
+        explication: `${capitaliserQcm(bonExemple.situation)} : c'est un exemple typique de ${bonExemple.typeForce}.`,
+      };
+    },
+  };
+}
+
+function construireScenarioEquilibreForces(): ScenarioQCM {
+  const scenario = affirmationEquilibreAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur l'équilibre des forces.",
+    "Choisis un contexte réaliste (jeu, chantier, sport) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-equilibre-forces"),
+        type: "qcm",
+        section: "A",
+        univers: "materiel",
+        conceptId: "ats-um-equilibre-deux-forces",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers technologique — Matériaux (QCM simple)
+// Sous-thème Matériaux, commun à ST et ATS (sousThemeId distinct :
+// "materiaux-st" / "materiaux-ats", mais mêmes concepts et grandeurs).
+// ------------------------------------------------------------
+
+function construireScenarioContrainte(parcours: Parcours): ScenarioQCM {
   const scenario = scenarioContrainteAleatoire();
   const TOUS_TYPES = ["traction", "compression", "torsion", "flexion", "cisaillement"] as const;
   const autres = melanger([...TOUS_TYPES].filter((t) => t !== scenario.type)).slice(0, 3);
@@ -1012,7 +1448,7 @@ function construireScenarioContrainte(): ScenarioQCM {
         type: "qcm",
         section: "A",
         univers: "technologique",
-        conceptId: "st-ut-contraintes",
+        conceptId: parcours === "ST" ? "st-ut-contraintes" : "ats-ut-contraintes",
         enonce: `${miseEnSituation} Situation observée : ${scenario.situation}. Quel type de contrainte cette pièce subit-elle principalement ?`,
         choix,
         bonneReponseId,
@@ -1022,7 +1458,7 @@ function construireScenarioContrainte(): ScenarioQCM {
   };
 }
 
-function construireScenarioProprieteMateriau(): ScenarioQCM {
+function construireScenarioProprieteMateriau(parcours: Parcours): ScenarioQCM {
   const bonMateriau = choisirMateriauAleatoire();
   const autres = melanger(BANQUE_MATERIAUX.filter((m) => m.id !== bonMateriau.id)).slice(0, 3);
 
@@ -1046,11 +1482,145 @@ function construireScenarioProprieteMateriau(): ScenarioQCM {
         type: "qcm",
         section: "A",
         univers: "technologique",
-        conceptId: "st-ut-proprietes-mecaniques",
+        conceptId: parcours === "ST" ? "st-ut-proprietes-mecaniques" : "ats-ut-proprietes-mecaniques",
         enonce: `${miseEnSituation} Pour ${bonMateriau.exempleUsage}, on choisit le ${bonMateriau.nom}. Quelle propriété de ce matériau justifie le mieux ce choix ?`,
         choix,
         bonneReponseId,
         explication: `${capitaliserQcm(bonMateriau.nom)} est utilisé pour ${bonMateriau.exempleUsage} notamment parce qu'il est ${bonMateriau.proprietesCles.join(", ")}.`,
+      };
+    },
+  };
+}
+
+function construireScenarioDegradation(parcours: Parcours): ScenarioQCM {
+  const bonTraitement = traitementDegradationAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une courte phrase d'introduction (1 phrase), en français québécois neutre,",
+    "qui situe l'entretien ou la protection d'un objet ou d'une pièce métallique.",
+    "Reste général — ne nomme AUCUN traitement, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = "vrai";
+
+      return {
+        id: idAleatoire("qcm-degradation"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: parcours === "ST" ? "st-ut-degradation" : "ats-ut-degradation",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${capitaliserQcm(bonTraitement.nom)} ${bonTraitement.role}. » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: `${capitaliserQcm(bonTraitement.nom)} ${bonTraitement.role} : c'est bien un traitement qui protège le matériau contre sa dégradation.`,
+      };
+    },
+  };
+}
+
+// ------------------------------------------------------------
+// Univers technologique — Langage des lignes (cotation fonctionnelle,
+// développements) et Fabrication, propres au parcours ATS.
+// ------------------------------------------------------------
+
+function construireScenarioCotationFonctionnelle(): ScenarioQCM {
+  const scenario = affirmationCotationAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une mise en situation courte (1 phrase), en français québécois neutre,",
+    "pour une question de sciences de 4e secondaire sur le dessin technique d'une pièce mécanique.",
+    "Choisis un contexte réaliste (atelier, dessin technique, fabrication) — varie ton choix à chaque fois.",
+    "Ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = scenario.correcte ? "vrai" : "faux";
+
+      return {
+        id: idAleatoire("qcm-cotation"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "ats-ut-cotation-fonctionnelle",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « ${scenario.affirmation} » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: scenario.explication,
+      };
+    },
+  };
+}
+
+function construireScenarioDeveloppements(): ScenarioQCM {
+  const bonDev = developpementAleatoire();
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une courte phrase d'introduction (1 phrase), en français québécois neutre,",
+    "qui situe la fabrication d'un objet à partir d'un matériau en feuille (carton, métal).",
+    "Reste général — ne nomme AUCUN solide géométrique, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const choix: ChoixQCM[] = melanger([
+        { id: "vrai", texte: "Vrai" },
+        { id: "faux", texte: "Faux" },
+      ]);
+      const bonneReponseId = "vrai";
+
+      return {
+        id: idAleatoire("qcm-developpement"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "ats-ut-developpements",
+        enonce: `${miseEnSituation} Affirmation à évaluer : « Le développement de ${bonDev.solide} permet de fabriquer, à partir d'un matériau en feuille, un objet comme ${bonDev.exempleObjet}. » Vrai ou faux ?`,
+        choix,
+        bonneReponseId,
+        explication: `Le développement d'un solide est le tracé à plat de ses faces : celui de ${bonDev.solide} correspond bien à la fabrication d'objets comme ${bonDev.exempleObjet}.`,
+      };
+    },
+  };
+}
+
+function construireScenarioFabrication(): ScenarioQCM {
+  const bonneOperation = operationFabricationAleatoire();
+  const autres = melanger(BANQUE_OPERATIONS_FABRICATION.filter((o) => o.id !== bonneOperation.id)).slice(0, 3);
+
+  const promptScenario = [
+    "Tu écris UNIQUEMENT une courte phrase d'introduction (1 phrase), en français québécois neutre,",
+    "qui situe une opération d'usinage réalisée en atelier sur une pièce.",
+    "Reste général — ne nomme AUCUNE opération de fabrication, ne révèle aucune réponse.",
+  ].join("\n");
+
+  return {
+    promptScenario,
+    construire: (miseEnSituation) => {
+      const toutes = melanger([bonneOperation, ...autres]);
+      const choix: ChoixQCM[] = toutes.map((o, i) => ({ id: String.fromCharCode(97 + i), texte: capitaliserQcm(o.nom) }));
+      const bonneReponseId = choix[toutes.findIndex((o) => o.id === bonneOperation.id)].id;
+
+      return {
+        id: idAleatoire("qcm-fabrication"),
+        type: "qcm",
+        section: "A",
+        univers: "technologique",
+        conceptId: "ats-ut-fabrication",
+        enonce: `${miseEnSituation} Cette opération ${bonneOperation.description}. Quelle opération de fabrication est-ce ?`,
+        choix,
+        bonneReponseId,
+        explication: `${capitaliserQcm(bonneOperation.nom)} ${bonneOperation.description} : c'est la définition même de cette opération.`,
       };
     },
   };
@@ -1073,24 +1643,42 @@ const CONSTRUCTEURS_SCENARIO: ScenarioDisponible[] = [
   { parcours: ["ST", "ATS"], univers: "materiel", sousThemeId: "electricite", construire: construireScenarioLoiOhm },
   { parcours: ["ST"], univers: "materiel", sousThemeId: "proprietes-solutions", construire: () => construireScenarioPh() },
   { parcours: ["ST"], univers: "materiel", sousThemeId: "transformations-chimiques", construire: () => construireScenarioBalancement() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "transformations-chimiques", construire: () => construireScenarioOxydation() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "transformations-chimiques", construire: () => construireScenarioCombustionAts() },
   { parcours: ["ST", "ATS"], univers: "technologique", sousThemeId: "ingenierie-mecanique", construire: construireScenarioTrainTableau },
   { parcours: ["ATS"], univers: "materiel", sousThemeId: "forces-mouvements", construire: () => construireScenarioForceGravitationnelle() },
   { parcours: ["ATS"], univers: "materiel", sousThemeId: "forces-mouvements", construire: () => construireScenarioVitesse() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "forces-mouvements", construire: () => construireScenarioTypesForces() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "forces-mouvements", construire: () => construireScenarioEquilibreForces() },
   { parcours: ["ST"], univers: "terreEspace", sousThemeId: "atmosphere", construire: () => construireScenarioEffetDeSerre() },
   { parcours: ["ATS"], univers: "terreEspace", sousThemeId: "atmosphere", construire: () => construireScenarioCycloneAnticyclone() },
   { parcours: ["ST"], univers: "terreEspace", sousThemeId: "cycles-biogeochimiques", construire: () => construireScenarioCycleCarbone() },
+  { parcours: ["ATS"], univers: "terreEspace", sousThemeId: "espace", construire: () => construireScenarioMaree() },
   { parcours: ["ST"], univers: "materiel", sousThemeId: "organisation-matiere", construire: () => construireScenarioRutherfordBohr() },
   { parcours: ["ST"], univers: "materiel", sousThemeId: "organisation-matiere", construire: () => construireScenarioFamillesPeriodes() },
-  { parcours: ["ST"], univers: "materiel", sousThemeId: "electromagnetisme", construire: () => construireScenarioChampFil() },
-  { parcours: ["ST"], univers: "materiel", sousThemeId: "electromagnetisme", construire: () => construireScenarioAttractionRepulsion() },
+  { parcours: ["ST", "ATS"], univers: "materiel", sousThemeId: "electromagnetisme", construire: construireScenarioChampFil },
+  { parcours: ["ST", "ATS"], univers: "materiel", sousThemeId: "electromagnetisme", construire: construireScenarioAttractionRepulsion },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "electromagnetisme", construire: () => construireScenarioSolenoide() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "electromagnetisme", construire: () => construireScenarioInduction() },
   { parcours: ["ST"], univers: "materiel", sousThemeId: "transformation-energie", construire: () => construireScenarioConservationEnergie() },
   { parcours: ["ST", "ATS"], univers: "materiel", sousThemeId: "transformation-energie", construire: construireScenarioRendement },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "fluides", construire: () => construireScenarioArchimede() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "fluides", construire: () => construireScenarioPascal() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "fluides", construire: () => construireScenarioBernoulli() },
   { parcours: ["ST", "ATS"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: construireScenarioResistanceCodeCouleur },
-  { parcours: ["ST"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: () => construireScenarioAlimentation() },
+  { parcours: ["ST", "ATS"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: construireScenarioAlimentation },
   { parcours: ["ST"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: () => construireScenarioCommande() },
-  { parcours: ["ST"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: () => construireScenarioTransformationEnergieElec() },
-  { parcours: ["ST"], univers: "technologique", sousThemeId: "materiaux-st", construire: () => construireScenarioContrainte() },
-  { parcours: ["ST"], univers: "technologique", sousThemeId: "materiaux-st", construire: () => construireScenarioProprieteMateriau() },
+  { parcours: ["ATS"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: () => construireScenarioCommandeAts() },
+  { parcours: ["ST", "ATS"], univers: "technologique", sousThemeId: "ingenierie-electrique", construire: construireScenarioTransformationEnergieElec },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "materiaux-st", construire: construireScenarioContrainte },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "materiaux-st", construire: construireScenarioProprieteMateriau },
+  { parcours: ["ST"], univers: "technologique", sousThemeId: "materiaux-st", construire: construireScenarioDegradation },
+  { parcours: ["ATS"], univers: "technologique", sousThemeId: "materiaux-ats", construire: construireScenarioContrainte },
+  { parcours: ["ATS"], univers: "technologique", sousThemeId: "materiaux-ats", construire: construireScenarioProprieteMateriau },
+  { parcours: ["ATS"], univers: "technologique", sousThemeId: "materiaux-ats", construire: construireScenarioDegradation },
+  { parcours: ["ATS"], univers: "technologique", sousThemeId: "langage-des-lignes", construire: () => construireScenarioCotationFonctionnelle() },
+  { parcours: ["ATS"], univers: "technologique", sousThemeId: "langage-des-lignes", construire: () => construireScenarioDeveloppements() },
+  { parcours: ["ATS"], univers: "technologique", sousThemeId: "fabrication", construire: () => construireScenarioFabrication() },
 ];
 
 /**

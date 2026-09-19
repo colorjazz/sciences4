@@ -44,7 +44,21 @@ export const CHAPITRES_AVEC_CONTENU: Record<Parcours, Record<SectionEpreuve, Set
     C: new Set(["ingenierie-mecanique"]),
   },
   ATS: {
-    A: new Set(["electricite", "ingenierie-mecanique", "forces-mouvements", "atmosphere", "transformation-energie", "ingenierie-electrique"]),
+    A: new Set([
+      "electricite",
+      "ingenierie-mecanique",
+      "forces-mouvements",
+      "atmosphere",
+      "espace",
+      "transformation-energie",
+      "ingenierie-electrique",
+      "transformations-chimiques",
+      "electromagnetisme",
+      "fluides",
+      "materiaux-ats",
+      "langage-des-lignes",
+      "fabrication",
+    ]),
     B: new Set([
       "electricite",
       "forces-mouvements",

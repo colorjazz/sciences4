@@ -149,3 +149,27 @@ export const BANQUE_CONTRAINTES: ScenarioContrainte[] = [
 export function scenarioContrainteAleatoire(): ScenarioContrainte {
   return BANQUE_CONTRAINTES[Math.floor(Math.random() * BANQUE_CONTRAINTES.length)];
 }
+
+// ============================================================
+// Modification des propriétés (dégradation, protection) — concept
+// prescrit commun à ST et ATS. Portée confirmée dans les deux
+// Progressions des apprentissages : « décrire différents traitements
+// pour contrer la dégradation des matériaux (ex. plaquage des
+// métaux, traitement antirouille à l'huile, peinture) ».
+// ============================================================
+
+export interface TraitementDegradation {
+  id: string;
+  nom: string;
+  role: string;
+}
+
+export const BANQUE_TRAITEMENTS_DEGRADATION: TraitementDegradation[] = [
+  { id: "plaquage", nom: "le plaquage des métaux", role: "recouvre le métal d'une fine couche d'un autre métal plus résistant à la corrosion" },
+  { id: "antirouille-huile", nom: "un traitement antirouille à l'huile", role: "forme une barrière qui empêche l'humidité et l'air d'atteindre le métal" },
+  { id: "peinture", nom: "l'application de peinture", role: "forme une barrière protectrice contre l'humidité et l'air à la surface du matériau" },
+];
+
+export function traitementDegradationAleatoire(): TraitementDegradation {
+  return BANQUE_TRAITEMENTS_DEGRADATION[Math.floor(Math.random() * BANQUE_TRAITEMENTS_DEGRADATION.length)];
+}
