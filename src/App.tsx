@@ -1,5 +1,6 @@
 import { useState } from "react";
 import ParcoursSelector from "./components/ParcoursSelector/ParcoursSelector";
+import ChapitreSelector from "./components/ChapitreSelector/ChapitreSelector";
 import PartieA from "./components/PartieA/PartieA";
 import PartieB from "./components/PartieB/PartieB";
 import PartieC from "./components/PartieC/PartieC";
@@ -7,8 +8,9 @@ import { Logomark } from "./components/Logomark";
 import type { Parcours, SectionEpreuve } from "./types/curriculum";
 import { getStructureEpreuve } from "./types/curriculum";
 import { LIBELLES_MODULES } from "./utils/libellesPratique";
+import { chapitresDisponibles, sectionADuContenu } from "./utils/couverturePratique";
 
-type Vue = "parcours" | "modules" | SectionEpreuve;
+type Vue = "parcours" | "chapitres" | "modules" | SectionEpreuve;
 
 const ICON_ACCUEIL = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,10 +30,19 @@ const ICON_MODULES = (
 
 export default function App() {
   const [parcours, setParcours] = useState<Parcours | null>(null);
+  const [chapitresSelectionnes, setChapitresSelectionnes] = useState<Set<string>>(new Set());
   const [vue, setVue] = useState<Vue>("parcours");
 
   function choisirParcours(p: Parcours) {
     setParcours(p);
+    // Par défaut, tous les chapitres disponibles sont sélectionnés (comme
+    // le comportement d'origine, avant l'ajout du filtre par chapitre).
+    setChapitresSelectionnes(chapitresDisponibles(p));
+    setVue("chapitres");
+  }
+
+  function confirmerChapitres(selection: Set<string>) {
+    setChapitresSelectionnes(selection);
     setVue("modules");
   }
 
@@ -39,7 +50,7 @@ export default function App() {
     setVue("modules");
   }
 
-  const surModules = vue === "modules" || vue === "A" || vue === "B" || vue === "C";
+  const surModules = vue === "chapitres" || vue === "modules" || vue === "A" || vue === "B" || vue === "C";
 
   return (
     <div className="app-shell">
@@ -66,12 +77,30 @@ export default function App() {
 
       {vue === "parcours" && <ParcoursSelector onConfirm={choisirParcours} />}
 
-      {vue === "modules" && parcours && (
-        <ModulesPratique parcours={parcours} onSelection={setVue} onRetour={() => setVue("parcours")} />
+      {vue === "chapitres" && parcours && (
+        <ChapitreSelector
+          parcours={parcours}
+          selectionInitiale={chapitresSelectionnes}
+          onConfirm={confirmerChapitres}
+          onRetour={() => setVue("parcours")}
+        />
       )}
 
-      {vue === "A" && parcours && <PartieA parcours={parcours} onRetour={retourModules} />}
-      {vue === "B" && parcours && <PartieB parcours={parcours} onRetour={retourModules} />}
+      {vue === "modules" && parcours && (
+        <ModulesPratique
+          parcours={parcours}
+          chapitresSelectionnes={chapitresSelectionnes}
+          onSelection={setVue}
+          onChangerChapitres={() => setVue("chapitres")}
+        />
+      )}
+
+      {vue === "A" && parcours && (
+        <PartieA parcours={parcours} chapitresSelectionnes={chapitresSelectionnes} onRetour={retourModules} />
+      )}
+      {vue === "B" && parcours && (
+        <PartieB parcours={parcours} chapitresSelectionnes={chapitresSelectionnes} onRetour={retourModules} />
+      )}
       {vue === "C" && parcours && <PartieC parcours={parcours} onRetour={retourModules} />}
 
       <nav className="bottom-nav" aria-label="Navigation principale">
@@ -98,12 +127,14 @@ export default function App() {
 
 function ModulesPratique({
   parcours,
+  chapitresSelectionnes,
   onSelection,
-  onRetour,
+  onChangerChapitres,
 }: {
   parcours: Parcours;
+  chapitresSelectionnes: Set<string>;
   onSelection: (v: Vue) => void;
-  onRetour: () => void;
+  onChangerChapitres: () => void;
 }) {
   const structure = getStructureEpreuve(parcours);
 
@@ -119,11 +150,13 @@ function ModulesPratique({
       <div className="modules-grid">
         {structure.sections.map((s: { section: SectionEpreuve; nombreQuestions: number }) => {
           const libelle = LIBELLES_MODULES[s.section];
+          const disponible = sectionADuContenu(parcours, s.section, chapitresSelectionnes);
           return (
             <button
               key={s.section}
               type="button"
-              className="module-card"
+              className={`module-card${disponible ? "" : " indisponible"}`}
+              disabled={!disponible}
               onClick={() => onSelection(s.section)}
             >
               <h3 className={libelle.logoPrefix ? "module-card-brand" : undefined}>
@@ -136,9 +169,9 @@ function ModulesPratique({
                   libelle.titre
                 )}
               </h3>
-              <p>{libelle.description}</p>
+              <p>{disponible ? libelle.description : "Aucun chapitre sélectionné n'a de contenu ici pour l'instant."}</p>
               <span className="card-foot">
-                <span>{s.nombreQuestions} questions</span>
+                <span>{disponible ? `${s.nombreQuestions} questions` : "Bientôt"}</span>
                 <span className="card-arrow" aria-hidden="true">→</span>
               </span>
             </button>
@@ -146,8 +179,8 @@ function ModulesPratique({
         })}
       </div>
 
-      <button type="button" className="ghost" style={{ marginTop: "1.5rem" }} onClick={onRetour}>
-        Changer de parcours
+      <button type="button" className="ghost" style={{ marginTop: "1.5rem" }} onClick={onChangerChapitres}>
+        Changer les chapitres
       </button>
     </div>
   );

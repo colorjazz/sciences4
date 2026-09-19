@@ -695,3 +695,42 @@ export function tirerConceptsAleatoires(
   }
   return resultat;
 }
+
+// ============================================================
+// 7. CHAPITRES (sous-thèmes) SÉLECTIONNABLES PAR L'ÉLÈVE
+// ============================================================
+
+/**
+ * Un "chapitre" au sens de cette application est calqué sur les sous-thèmes
+ * du curriculum ci-dessus — ce n'est pas une notion officielle du MEQ, juste
+ * le grain le plus pratique déjà disponible dans l'arbre pour laisser
+ * l'élève choisir sur quoi s'exercer (voir ChapitreSelector).
+ */
+export interface SousThemeAvecUnivers {
+  id: string;
+  titre: string;
+  universId: UniversEvalue;
+  universTitre: string;
+}
+
+/** Liste tous les sous-thèmes (chapitres) d'un parcours, univers par univers. */
+export function getSousThemes(parcours: Parcours): SousThemeAvecUnivers[] {
+  const arbre = getCurriculum(parcours);
+  return arbre.univers.flatMap((u) =>
+    u.sousThemes.map((st) => ({ id: st.id, titre: st.titre, universId: u.id, universTitre: u.titre }))
+  );
+}
+
+/** Retrouve l'id du sous-thème (chapitre) qui contient un concept donné. */
+export function findSousThemeIdForConcept(
+  parcours: Parcours,
+  conceptId: string
+): string | undefined {
+  const arbre = getCurriculum(parcours);
+  for (const univers of arbre.univers) {
+    for (const sousTheme of univers.sousThemes) {
+      if (sousTheme.concepts.some((c) => c.id === conceptId)) return sousTheme.id;
+    }
+  }
+  return undefined;
+}

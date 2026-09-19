@@ -6,14 +6,15 @@ import type { Parcours } from "../../types/curriculum";
 
 interface PartieAProps {
   parcours: Parcours;
+  chapitresSelectionnes: Set<string>;
   onRetour: () => void;
 }
 
 const NOMBRE_QUESTIONS = 15;
 
-export default function PartieA({ parcours, onRetour }: PartieAProps) {
+export default function PartieA({ parcours, chapitresSelectionnes, onRetour }: PartieAProps) {
   const { donnees: questions, chargement, erreur, regenerer } = useGenerationLot(() =>
-    genererLotQuestionsQCM(NOMBRE_QUESTIONS, parcours)
+    genererLotQuestionsQCM(NOMBRE_QUESTIONS, parcours, chapitresSelectionnes)
   );
   const [index, setIndex] = useState(0);
   const [choixSelectionne, setChoixSelectionne] = useState<string | null>(null);

@@ -28,6 +28,7 @@ import {
   CONCEPT_SUFFIXE_PAR_SPHERE,
   LIBELLE_SPHERE,
   classifierSalinite,
+  type SphereTerreEspace,
 } from "../engines/terreEspaceEngine";
 import { demanderMiseEnSituation } from "../ai/geminiClient";
 
@@ -303,8 +304,14 @@ async function genCourteTrainVitesse(parcours: Parcours): Promise<QuestionCourte
 // partagé ST/ATS (répété à l'identique dans les deux arbres).
 // ------------------------------------------------------------
 
-async function genCourteRessourceEnergetique(parcours: Parcours): Promise<QuestionCourte> {
-  const ressource = BANQUE_RESSOURCES_ENERGETIQUES[Math.floor(Math.random() * BANQUE_RESSOURCES_ENERGETIQUES.length)];
+async function genCourteRessourceEnergetique(
+  parcours: Parcours,
+  spheresAutorisees?: SphereTerreEspace[]
+): Promise<QuestionCourte> {
+  const banque = spheresAutorisees
+    ? BANQUE_RESSOURCES_ENERGETIQUES.filter((r) => spheresAutorisees.includes(r.sphere))
+    : BANQUE_RESSOURCES_ENERGETIQUES;
+  const ressource = banque[Math.floor(Math.random() * banque.length)];
 
   const optionsRenouvelable: OptionChoix[] = melanger([
     { id: "renouvelable", texte: "Renouvelable" },
@@ -427,16 +434,34 @@ async function genCourteSalinite(): Promise<QuestionCourte> {
 interface GenerateurDisponible {
   parcours: Parcours[];
   univers: UniversEvalue;
-  generer: (parcours: Parcours) => Promise<QuestionCourte>;
+  /**
+   * Chapitres (sous-thèmes) que ce générateur peut produire — voir
+   * couverturePratique.ts. Ressource énergétique en couvre trois (le sujet
+   * exact est pigé au hasard À L'INTÉRIEUR du générateur), les autres n'en
+   * ont qu'un seul.
+   */
+  sousThemesId: string[];
+  generer: (parcours: Parcours, chapitresSelectionnes?: Set<string>) => Promise<QuestionCourte>;
 }
 
 const GENERATEURS_DISPONIBLES: GenerateurDisponible[] = [
-  { parcours: ["ST", "ATS"], univers: "materiel", generer: genCourtePlaqueSignaletique },
-  { parcours: ["ST"], univers: "materiel", generer: () => genCourteConcentrationRecommandation() },
-  { parcours: ["ATS"], univers: "materiel", generer: () => genCourteForceRecommandation() },
-  { parcours: ["ST", "ATS"], univers: "technologique", generer: genCourteTrainVitesse },
-  { parcours: ["ST", "ATS"], univers: "terreEspace", generer: genCourteRessourceEnergetique },
-  { parcours: ["ST"], univers: "terreEspace", generer: () => genCourteSalinite() },
+  { parcours: ["ST", "ATS"], univers: "materiel", sousThemesId: ["electricite"], generer: genCourtePlaqueSignaletique },
+  { parcours: ["ST"], univers: "materiel", sousThemesId: ["proprietes-solutions"], generer: () => genCourteConcentrationRecommandation() },
+  { parcours: ["ATS"], univers: "materiel", sousThemesId: ["forces-mouvements"], generer: () => genCourteForceRecommandation() },
+  { parcours: ["ST", "ATS"], univers: "technologique", sousThemesId: ["ingenierie-mecanique"], generer: genCourteTrainVitesse },
+  {
+    parcours: ["ST", "ATS"],
+    univers: "terreEspace",
+    sousThemesId: ["lithosphere", "hydrosphere", "atmosphere"],
+    generer: (parcours, chapitresSelectionnes) => {
+      const spheres: SphereTerreEspace[] = ["lithosphere", "hydrosphere", "atmosphere"];
+      const spheresAutorisees = chapitresSelectionnes
+        ? spheres.filter((s) => chapitresSelectionnes.has(s))
+        : undefined;
+      return genCourteRessourceEnergetique(parcours, spheresAutorisees);
+    },
+  },
+  { parcours: ["ST"], univers: "terreEspace", sousThemesId: ["hydrosphere"], generer: () => genCourteSalinite() },
 ];
 
 function universVoulu(parcours: Parcours): UniversEvalue | undefined {
@@ -454,11 +479,27 @@ function universVoulu(parcours: Parcours): UniversEvalue | undefined {
   return file[Math.floor(Math.random() * file.length)];
 }
 
-export async function genererQuestionCourte(parcours: Parcours = "ST"): Promise<QuestionCourte> {
-  const disponibles = GENERATEURS_DISPONIBLES.filter((g) => g.parcours.includes(parcours));
+/**
+ * @param chapitresSelectionnes ids de sous-thèmes (voir curriculum.ts /
+ * ChapitreSelector) sur lesquels restreindre le tirage. `undefined` = aucune
+ * restriction (comportement d'origine, tous les chapitres mélangés).
+ */
+export async function genererQuestionCourte(
+  parcours: Parcours = "ST",
+  chapitresSelectionnes?: Set<string>
+): Promise<QuestionCourte> {
+  const admissiblesParcours = GENERATEURS_DISPONIBLES.filter((g) => g.parcours.includes(parcours));
+  const disponibles = chapitresSelectionnes
+    ? admissiblesParcours.filter((g) => g.sousThemesId.some((id) => chapitresSelectionnes.has(id)))
+    : admissiblesParcours;
+
+  if (disponibles.length === 0) {
+    throw new Error("Aucune question disponible pour les chapitres sélectionnés.");
+  }
+
   const voulu = universVoulu(parcours);
   const pourCetUnivers = voulu ? disponibles.filter((g) => g.univers === voulu) : [];
   const pool = pourCetUnivers.length > 0 ? pourCetUnivers : disponibles;
   const entree = pool[Math.floor(Math.random() * pool.length)];
-  return entree.generer(parcours);
+  return entree.generer(parcours, chapitresSelectionnes);
 }

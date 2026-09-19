@@ -484,18 +484,20 @@ interface ScenarioDisponible {
   /** Parcours pour lesquels ce scénario est admissible (voir curriculum.ts). */
   parcours: Parcours[];
   univers: UniversEvalue;
+  /** Chapitre (sous-thème) auquel ce scénario appartient — voir couverturePratique.ts. */
+  sousThemeId: string;
   construire: (parcours: Parcours) => ScenarioQCM;
 }
 
 const CONSTRUCTEURS_SCENARIO: ScenarioDisponible[] = [
-  { parcours: ["ST", "ATS"], univers: "materiel", construire: construireScenarioLoiOhm },
-  { parcours: ["ST"], univers: "materiel", construire: () => construireScenarioPh() },
-  { parcours: ["ST"], univers: "materiel", construire: () => construireScenarioBalancement() },
-  { parcours: ["ST", "ATS"], univers: "technologique", construire: construireScenarioTrainTableau },
-  { parcours: ["ATS"], univers: "materiel", construire: () => construireScenarioForceGravitationnelle() },
-  { parcours: ["ATS"], univers: "materiel", construire: () => construireScenarioVitesse() },
-  { parcours: ["ST"], univers: "terreEspace", construire: () => construireScenarioEffetDeSerre() },
-  { parcours: ["ATS"], univers: "terreEspace", construire: () => construireScenarioCycloneAnticyclone() },
+  { parcours: ["ST", "ATS"], univers: "materiel", sousThemeId: "electricite", construire: construireScenarioLoiOhm },
+  { parcours: ["ST"], univers: "materiel", sousThemeId: "proprietes-solutions", construire: () => construireScenarioPh() },
+  { parcours: ["ST"], univers: "materiel", sousThemeId: "transformations-chimiques", construire: () => construireScenarioBalancement() },
+  { parcours: ["ST", "ATS"], univers: "technologique", sousThemeId: "ingenierie-mecanique", construire: construireScenarioTrainTableau },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "forces-mouvements", construire: () => construireScenarioForceGravitationnelle() },
+  { parcours: ["ATS"], univers: "materiel", sousThemeId: "forces-mouvements", construire: () => construireScenarioVitesse() },
+  { parcours: ["ST"], univers: "terreEspace", sousThemeId: "atmosphere", construire: () => construireScenarioEffetDeSerre() },
+  { parcours: ["ATS"], univers: "terreEspace", sousThemeId: "atmosphere", construire: () => construireScenarioCycloneAnticyclone() },
 ];
 
 /**
@@ -524,8 +526,25 @@ function fileUniversPourSectionA(parcours: Parcours, nombreQuestions: number): U
   return melanger(file);
 }
 
-export async function genererLotQuestionsQCM(nombreQuestions = 15, parcours: Parcours = "ST"): Promise<QuestionQCM[]> {
-  const disponibles = CONSTRUCTEURS_SCENARIO.filter((c) => c.parcours.includes(parcours));
+/**
+ * @param chapitresSelectionnes ids de sous-thèmes (voir curriculum.ts /
+ * ChapitreSelector) sur lesquels restreindre le tirage. `undefined` = aucune
+ * restriction (comportement d'origine, tous les chapitres mélangés).
+ */
+export async function genererLotQuestionsQCM(
+  nombreQuestions = 15,
+  parcours: Parcours = "ST",
+  chapitresSelectionnes?: Set<string>
+): Promise<QuestionQCM[]> {
+  const admissiblesParcours = CONSTRUCTEURS_SCENARIO.filter((c) => c.parcours.includes(parcours));
+  const disponibles = chapitresSelectionnes
+    ? admissiblesParcours.filter((c) => chapitresSelectionnes.has(c.sousThemeId))
+    : admissiblesParcours;
+
+  if (disponibles.length === 0) {
+    throw new Error("Aucune question disponible pour les chapitres sélectionnés.");
+  }
+
   const fileUnivers = fileUniversPourSectionA(parcours, nombreQuestions);
 
   const scenarios: ScenarioQCM[] = [];

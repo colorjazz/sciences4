@@ -1293,3 +1293,101 @@ button.ghost:hover {
   color: var(--graphite-soft);
   margin-top: 0.4rem;
 }
+
+/* ----------------------------------------------------------
+   Sélecteur de chapitres
+   ---------------------------------------------------------- */
+
+.chapitres-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.chapitres-actions button {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+}
+
+.chapitres-groupes {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.chapitre-groupe h3 {
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--graphite-soft);
+  margin: 0 0 0.6rem;
+  font-weight: 500;
+}
+
+.chapitre-liste {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.chapitre-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-raised);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--graphite);
+  transition: border-color 0.18s ease;
+}
+
+.chapitre-item:has(input:checked) {
+  border-color: var(--cobalt);
+  background: var(--cobalt-soft);
+}
+
+.chapitre-item.indisponible {
+  cursor: not-allowed;
+  color: var(--graphite-soft);
+  opacity: 0.65;
+}
+
+.chapitre-item input[type="checkbox"] {
+  accent-color: var(--cobalt);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.chapitre-badge {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brass);
+  background: var(--brass-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.22rem 0.55rem;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------
+   Module indisponible (aucun chapitre sélectionné n'y a de contenu)
+   ---------------------------------------------------------- */
+
+.module-card.indisponible {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.module-card.indisponible:hover {
+  border-color: var(--line);
+  transform: none;
+  box-shadow: none;
+}

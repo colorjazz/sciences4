@@ -8,12 +8,13 @@ import type { Parcours } from "../../types/curriculum";
 
 interface PartieBProps {
   parcours: Parcours;
+  chapitresSelectionnes: Set<string>;
   onRetour: () => void;
 }
 
-export default function PartieB({ parcours, onRetour }: PartieBProps) {
+export default function PartieB({ parcours, chapitresSelectionnes, onRetour }: PartieBProps) {
   const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(() =>
-    genererQuestionCourte(parcours)
+    genererQuestionCourte(parcours, chapitresSelectionnes)
   );
   const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
   const [pointsTotal, setPointsTotal] = useState(0);
