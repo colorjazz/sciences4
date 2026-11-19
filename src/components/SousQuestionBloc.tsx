@@ -250,7 +250,7 @@ export default function SousQuestionBloc({ sousQuestion, onNote }: SousQuestionB
             {resultat.points}/{resultat.pointsMax} point{resultat.pointsMax > 1 ? "s" : ""}
           </strong>
           <p style={{ margin: "0.35rem 0 0" }}>{resultat.retroaction}</p>
-          <p style={{ margin: "0.35rem 0 0", color: "var(--graphite-soft)" }}>{sousQuestion.explication}</p>
+          <p className="explication-corrigee" style={{ margin: "0.35rem 0 0", color: "var(--graphite-soft)" }}>{sousQuestion.explication}</p>
         </div>
       )}
     </div>

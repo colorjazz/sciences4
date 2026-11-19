@@ -658,6 +658,20 @@ button.ghost:hover {
   margin-bottom: 1.5rem;
 }
 
+.diagramme-physique {
+  display: flex;
+  justify-content: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.sous-question-notee .explication-corrigee {
+  white-space: pre-line;
+}
+
 /* Choix QCM */
 .choix-liste {
   display: grid;

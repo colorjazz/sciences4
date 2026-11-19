@@ -32,6 +32,7 @@ import type {
   SousQuestionMotsBanque,
   SousQuestionNotee,
   OptionChoix,
+  ElementOptique,
 } from "../types/question";
 import type { CoursSecondaire5, Difficulte } from "../types/curriculumSecondaire5";
 import { demanderMiseEnSituation } from "../ai/geminiClient";
@@ -69,7 +70,7 @@ import {
   resoudreChuteLibre,
   resoudreAccelerationPlanIncline,
   resoudreProjectileHorizontal,
-  resoudreProjectileChuteVerticale,
+  resoudreProjectileTempsChute,
   affirmationVitesseMoyInstantAleatoire,
 } from "../engines/cinematiqueEngine";
 import {
@@ -149,6 +150,59 @@ function nombreDistracteurs(difficulte: Difficulte): number {
   return difficulte === "facile" ? 1 : 3;
 }
 
+// ------------------------------------------------------------
+// Corrigé rigoureux — démarche exigée au Québec : données connues,
+// formule, substitution, réponse finale à chiffres significatifs.
+// Les calculs eux-mêmes restent en pleine précision (voir chaque
+// gabarit) ; seule la PRÉSENTATION finale est arrondie, et seulement
+// à la toute dernière étape.
+// ------------------------------------------------------------
+
+/** Arrondit à `chiffres` chiffres significatifs (3 par défaut). */
+function arrondirSig(valeur: number, chiffres = 3): number {
+  if (valeur === 0 || !Number.isFinite(valeur)) return 0;
+  const magnitude = Math.floor(Math.log10(Math.abs(valeur)));
+  const facteur = Math.pow(10, chiffres - 1 - magnitude);
+  return Math.round(valeur * facteur) / facteur;
+}
+
+/** Formate un nombre à `chiffres` chiffres significatifs, en évitant la notation scientifique pour les valeurs usuelles. */
+function formatSig(valeur: number, chiffres = 3): string {
+  const arrondi = arrondirSig(valeur, chiffres);
+  if (arrondi === 0) return "0";
+  if (Math.abs(arrondi) >= 1e-3 && Math.abs(arrondi) < 1e7) {
+    const magnitude = Math.floor(Math.log10(Math.abs(arrondi)));
+    const decimales = Math.max(0, chiffres - 1 - magnitude);
+    return arrondi.toFixed(decimales).replace(".", ",");
+  }
+  return arrondi.toExponential(chiffres - 1).replace(".", ",");
+}
+
+/**
+ * Construit une explication en 4 temps (données connues, formule, substitution,
+ * réponse finale encadrée) — la démarche attendue dans un corrigé de physique
+ * ou de chimie au Québec. `chiffres` contrôle la précision de la réponse finale
+ * affichée (3 par défaut) ; `donnees`/`substitution` restent du texte libre
+ * déjà formaté par l'appelant (symboles, unités SI).
+ */
+function etapesCorrige(params: {
+  donnees: string[];
+  formule: string;
+  substitution: string;
+  reponseValeur: number;
+  reponseUnite?: string;
+  chiffres?: number;
+}): string {
+  const valeurFormatee = formatSig(params.reponseValeur, params.chiffres ?? 3);
+  const reponse = params.reponseUnite ? `${valeurFormatee} ${params.reponseUnite}` : valeurFormatee;
+  return [
+    `Données connues : ${params.donnees.join(", ")}.`,
+    `Formule : ${params.formule}`,
+    `Substitution : ${params.substitution}`,
+    `Réponse : ${reponse}`,
+  ].join("\n");
+}
+
 function construireQcmVraiFaux(params: {
   idPrefixe: string;
   conceptId: string;
@@ -223,7 +277,13 @@ async function genCourteLoiGenerale(difficulte: Difficulte): Promise<QuestionCou
     uniteAttendue: "kPa",
     reponseAttendue: Number(p2KPa.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `En convertissant les températures en kelvins (T₁ = ${t1C} + 273 = ${t1K} K, T₂ = ${t2C} + 273 = ${t2K} K) et en appliquant p₁V₁/T₁ = p₂V₂/T₂ (n constant, car le contenant est fermé) : p₂ = (${p1} × ${v1} × ${t2K}) / (${t1K} × ${v2}) ≈ ${p2KPa.toFixed(1)} kPa.`,
+    explication: etapesCorrige({
+      donnees: [`p₁ = ${p1} kPa`, `V₁ = ${v1} L`, `T₁ = ${t1C} °C + 273 = ${t1K} K`, `V₂ = ${v2} L`, `T₂ = ${t2C} °C + 273 = ${t2K} K`],
+      formule: "p₁V₁/T₁ = p₂V₂/T₂ (n constant, contenant fermé)",
+      substitution: `p₂ = (${p1} × ${v1} × ${t2K}) / (${t1K} × ${v2})`,
+      reponseValeur: p2KPa,
+      reponseUnite: "kPa",
+    }),
   };
 
   const options: OptionChoix[] = [
@@ -272,7 +332,13 @@ async function genCourteGazParfaits(difficulte: Difficulte): Promise<QuestionCou
     uniteAttendue: "kPa",
     reponseAttendue: Number(pKPa.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `T = ${tC} + 273 = ${tK} K. Avec pV = nRT : p = nRT / V = (${n} × 8,314 × ${tK}) / ${v} ≈ ${pKPa.toFixed(1)} kPa.`,
+    explication: etapesCorrige({
+      donnees: [`n = ${n} mol`, `T = ${tC} °C + 273 = ${tK} K`, `V = ${v} L`, "R = 8,314 kPa·L/(mol·K)"],
+      formule: "pV = nRT, donc p = nRT / V",
+      substitution: `p = (${n} × 8,314 × ${tK}) / ${v}`,
+      reponseValeur: pKPa,
+      reponseUnite: "kPa",
+    }),
   };
 
   const options: OptionChoix[] = [
@@ -320,7 +386,13 @@ async function genCourteDalton(difficulte: Difficulte): Promise<QuestionCourte> 
     uniteAttendue: "kPa",
     reponseAttendue: pTotaleKPa,
     toleranceRelative: 0.01,
-    explication: `Selon la loi de Dalton, p(totale) = p(A) + p(B) + p(C) = ${pA} + ${pB} + ${pC} = ${pTotaleKPa} kPa.`,
+    explication: etapesCorrige({
+      donnees: [`p(A) = ${pA} kPa`, `p(B) = ${pB} kPa`, `p(C) = ${pC} kPa`],
+      formule: "p(totale) = p(A) + p(B) + p(C) (loi de Dalton)",
+      substitution: `p(totale) = ${pA} + ${pB} + ${pC}`,
+      reponseValeur: pTotaleKPa,
+      reponseUnite: "kPa",
+    }),
   };
 
   const { pManquanteKPa } = resoudrePressionPartielleManquante(pTotaleKPa, [pA, pB]);
@@ -333,7 +405,13 @@ async function genCourteDalton(difficulte: Difficulte): Promise<QuestionCourte> 
     uniteAttendue: "kPa",
     reponseAttendue: pManquanteKPa,
     toleranceRelative: 0.01,
-    explication: `p(C) = p(totale) - p(A) - p(B) = ${pTotaleKPa} - ${pA} - ${pB} = ${pManquanteKPa} kPa.`,
+    explication: etapesCorrige({
+      donnees: [`p(totale) = ${pTotaleKPa} kPa`, `p(A) = ${pA} kPa`, `p(B) = ${pB} kPa`],
+      formule: "p(C) = p(totale) - p(A) - p(B)",
+      substitution: `p(C) = ${pTotaleKPa} - ${pA} - ${pB}`,
+      reponseValeur: pManquanteKPa,
+      reponseUnite: "kPa",
+    }),
   };
 
   return {
@@ -369,7 +447,13 @@ async function genCourteVolumeMolaire(difficulte: Difficulte): Promise<QuestionC
     uniteAttendue: "L/mol",
     reponseAttendue: Number(vmLParMol.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `T = ${tC} + 273 = ${tK} K. Volume molaire Vm = RT / p = (8,314 × ${tK}) / ${pKPa} ≈ ${vmLParMol.toFixed(2)} L/mol.`,
+    explication: etapesCorrige({
+      donnees: [`T = ${tC} °C + 273 = ${tK} K`, `p = ${pKPa} kPa`, "R = 8,314 kPa·L/(mol·K)"],
+      formule: "Vm = RT / p",
+      substitution: `Vm = (8,314 × ${tK}) / ${pKPa}`,
+      reponseValeur: vmLParMol,
+      reponseUnite: "L/mol",
+    }),
   };
 
   const sousQuestionVolume: SousQuestionNumerique = {
@@ -381,7 +465,13 @@ async function genCourteVolumeMolaire(difficulte: Difficulte): Promise<QuestionC
     uniteAttendue: "L",
     reponseAttendue: Number(volumeEchantillonL.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `V = n × Vm = ${nMol} × ${vmLParMol.toFixed(2)} ≈ ${volumeEchantillonL.toFixed(2)} L.`,
+    explication: etapesCorrige({
+      donnees: [`n = ${nMol} mol`, `Vm = ${formatSig(vmLParMol, 3)} L/mol`],
+      formule: "V = n × Vm",
+      substitution: `V = ${nMol} × ${vmLParMol.toFixed(4)}`,
+      reponseValeur: volumeEchantillonL,
+      reponseUnite: "L",
+    }),
   };
 
   return {
@@ -500,7 +590,13 @@ async function genCourteDiagrammeEnergetique(difficulte: Difficulte): Promise<Qu
     uniteAttendue: "kJ",
     reponseAttendue: eaKJ,
     toleranceRelative: 0.01,
-    explication: `L'énergie d'activation est l'écart entre l'énergie des réactifs et le sommet du diagramme : Ea = ${d.energieMaxKJ} - ${d.energieReactifsKJ} = ${eaKJ} kJ.`,
+    explication: etapesCorrige({
+      donnees: [`énergie des réactifs = ${d.energieReactifsKJ} kJ`, `énergie au sommet = ${d.energieMaxKJ} kJ`],
+      formule: "Ea = énergie au sommet - énergie des réactifs",
+      substitution: `Ea = ${d.energieMaxKJ} - ${d.energieReactifsKJ}`,
+      reponseValeur: eaKJ,
+      reponseUnite: "kJ",
+    }),
   };
 
   const sousQuestionDeltaH: SousQuestionNumerique = {
@@ -512,7 +608,13 @@ async function genCourteDiagrammeEnergetique(difficulte: Difficulte): Promise<Qu
     uniteAttendue: "kJ",
     reponseAttendue: deltaHKJ,
     toleranceRelative: 0.01,
-    explication: `ΔH = énergie des produits - énergie des réactifs = ${d.energieProduitsKJ} - ${d.energieReactifsKJ} = ${deltaHKJ} kJ.`,
+    explication: etapesCorrige({
+      donnees: [`énergie des produits = ${d.energieProduitsKJ} kJ`, `énergie des réactifs = ${d.energieReactifsKJ} kJ`],
+      formule: "ΔH = énergie des produits - énergie des réactifs",
+      substitution: `ΔH = ${d.energieProduitsKJ} - ${d.energieReactifsKJ}`,
+      reponseValeur: deltaHKJ,
+      reponseUnite: "kJ",
+    }),
   };
 
   const options: OptionChoix[] = melanger([
@@ -561,7 +663,13 @@ async function genCourteCalorimetre(difficulte: Difficulte): Promise<QuestionCou
     uniteAttendue: "J",
     reponseAttendue: Number(chaleurJ.toFixed(0)),
     toleranceRelative: 0.02,
-    explication: `Q = mcΔT = ${masseEauG} × 4,19 × ${deltaT} ≈ ${chaleurJ.toFixed(0)} J (capacité thermique massique de l'eau : 4,19 J/(g·°C)).`,
+    explication: etapesCorrige({
+      donnees: [`m = ${masseEauG} g`, `c = 4,19 J/(g·°C) (eau)`, `ΔT = ${deltaT} °C`],
+      formule: "Q = mcΔT",
+      substitution: `Q = ${masseEauG} × 4,19 × ${deltaT}`,
+      reponseValeur: chaleurJ,
+      reponseUnite: "J",
+    }),
   };
 
   const sousQuestionMolaire: SousQuestionNumerique = {
@@ -573,7 +681,13 @@ async function genCourteCalorimetre(difficulte: Difficulte): Promise<QuestionCou
     uniteAttendue: "kJ/mol",
     reponseAttendue: Number(chaleurMolaireKJParMol.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `Chaleur molaire = Q / n = (${chaleurJ.toFixed(0)} / 1000) / ${nMol} ≈ ${chaleurMolaireKJParMol.toFixed(1)} kJ/mol.`,
+    explication: etapesCorrige({
+      donnees: [`Q = ${formatSig(chaleurJ, 3)} J`, `n = ${nMol} mol (réactif limitant)`],
+      formule: "Chaleur molaire = (Q / 1000) / n",
+      substitution: `Chaleur molaire = (${chaleurJ.toFixed(2)} / 1000) / ${nMol}`,
+      reponseValeur: chaleurMolaireKJParMol,
+      reponseUnite: "kJ/mol",
+    }),
   };
 
   return {
@@ -675,7 +789,13 @@ async function genCourteLoiVitesses(difficulte: Difficulte): Promise<QuestionCou
     bareme: { pointsMax: 2 },
     reponseAttendue: Number(vitesse.toFixed(3)),
     toleranceRelative: 0.02,
-    explication: `v = k[A]${ordre === 1 ? "" : "²"} = ${k} × ${concentration}${ordre === 1 ? "" : "²"} ≈ ${vitesse.toFixed(3)}.`,
+    explication: etapesCorrige({
+      donnees: [`k = ${k}`, `[A] = ${concentration} mol/L`],
+      formule: `v = k[A]${ordre === 1 ? "" : "²"}`,
+      substitution: ordre === 1 ? `v = ${k} × ${concentration}` : `v = ${k} × ${concentration}² = ${k} × ${(concentration * concentration).toFixed(4)}`,
+      reponseValeur: vitesse,
+      reponseUnite: "",
+    }),
   };
 
   const options: OptionChoix[] = ordre === 2
@@ -810,7 +930,13 @@ async function genCourtePH(difficulte: Difficulte): Promise<QuestionCourte> {
     bareme: { pointsMax: 2 },
     reponseAttendue: Number(ph.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `pH = -log₁₀[H₃O⁺] = -log₁₀(${concentrationH.toExponential(2)}) ≈ ${ph.toFixed(2)}.`,
+    explication: etapesCorrige({
+      donnees: [`[H₃O⁺] = ${concentrationH.toExponential(2)} mol/L`],
+      formule: "pH = -log₁₀[H₃O⁺]",
+      substitution: `pH = -log₁₀(${concentrationH.toExponential(2)})`,
+      reponseValeur: ph,
+      reponseUnite: "",
+    }),
   };
 
   const sousQuestionOH: SousQuestionNumerique = {
@@ -822,7 +948,13 @@ async function genCourtePH(difficulte: Difficulte): Promise<QuestionCourte> {
     uniteAttendue: "mol/L",
     reponseAttendue: Number(concentrationOHMolL.toExponential(2)),
     toleranceRelative: 0.05,
-    explication: `À 25 °C, Ke = [H₃O⁺][OH⁻] = 1,0 × 10⁻¹⁴. Donc [OH⁻] = Ke / [H₃O⁺] = (1,0 × 10⁻¹⁴) / (${concentrationH.toExponential(2)}) ≈ ${concentrationOHMolL.toExponential(2)} mol/L.`,
+    explication: etapesCorrige({
+      donnees: [`[H₃O⁺] = ${concentrationH.toExponential(2)} mol/L`, "Ke = [H₃O⁺][OH⁻] = 1,0 × 10⁻¹⁴ (à 25 °C)"],
+      formule: "[OH⁻] = Ke / [H₃O⁺]",
+      substitution: `[OH⁻] = (1,0 × 10⁻¹⁴) / (${concentrationH.toExponential(2)})`,
+      reponseValeur: concentrationOHMolL,
+      reponseUnite: "mol/L",
+    }),
   };
 
   return {
@@ -855,7 +987,13 @@ async function genCourteKa(difficulte: Difficulte): Promise<QuestionCourte> {
     bareme: { pointsMax: 3 },
     reponseAttendue: Number(ka.toExponential(2)),
     toleranceRelative: 0.05,
-    explication: `Ka = [H₃O⁺][A⁻] / [HA] = (${concH.toExponential(2)} × ${concH.toExponential(2)}) / ${concHA} ≈ ${ka.toExponential(2)}.`,
+    explication: etapesCorrige({
+      donnees: [`[HA] = ${concHA} mol/L`, `[H₃O⁺] = [A⁻] = ${concH.toExponential(2)} mol/L`],
+      formule: "Ka = [H₃O⁺][A⁻] / [HA]",
+      substitution: `Ka = (${concH.toExponential(2)} × ${concH.toExponential(2)}) / ${concHA}`,
+      reponseValeur: ka,
+      reponseUnite: "",
+    }),
   };
 
   return {
@@ -888,7 +1026,13 @@ async function genCourteKps(difficulte: Difficulte): Promise<QuestionCourte> {
     bareme: { pointsMax: 3 },
     reponseAttendue: Number(kps.toExponential(2)),
     toleranceRelative: 0.05,
-    explication: `Pour un sel binaire AB ⇌ A⁺ + B⁻, à l'équilibre [A⁺] = [B⁻] = s = ${solubilite.toExponential(2)} mol/L. Kps = [A⁺][B⁻] = s² = (${solubilite.toExponential(2)})² ≈ ${kps.toExponential(2)}.`,
+    explication: etapesCorrige({
+      donnees: [`AB ⇌ A⁺ + B⁻`, `à l'équilibre [A⁺] = [B⁻] = s = ${solubilite.toExponential(2)} mol/L`],
+      formule: "Kps = [A⁺][B⁻] = s²",
+      substitution: `Kps = (${solubilite.toExponential(2)})²`,
+      reponseValeur: kps,
+      reponseUnite: "",
+    }),
   };
 
   return {
@@ -990,7 +1134,13 @@ async function genCourteMRU(difficulte: Difficulte): Promise<QuestionCourte> {
     uniteAttendue: "m",
     reponseAttendue: Number(deplacementM.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `Δs = vΔt = ${v} × ${t} = ${deplacementM.toFixed(1)} m.`,
+    explication: etapesCorrige({
+      donnees: [`v = ${v} m/s`, `Δt = ${t} s`],
+      formule: "Δs = vΔt",
+      substitution: `Δs = ${v} × ${t}`,
+      reponseValeur: deplacementM,
+      reponseUnite: "m",
+    }),
   };
 
   return {
@@ -1025,7 +1175,13 @@ async function genCourteMRUA(difficulte: Difficulte): Promise<QuestionCourte> {
     uniteAttendue: "m/s²",
     reponseAttendue: Number(accelerationMS2.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `a = Δv / Δt = (${vf} - ${vi}) / ${t} ≈ ${accelerationMS2.toFixed(2)} m/s².`,
+    explication: etapesCorrige({
+      donnees: [`vᵢ = ${vi} m/s`, `v_f = ${vf} m/s`, `Δt = ${t} s`],
+      formule: "a = Δv / Δt",
+      substitution: `a = (${vf} - ${vi}) / ${t}`,
+      reponseValeur: accelerationMS2,
+      reponseUnite: "m/s²",
+    }),
   };
 
   const sousQuestionDistance: SousQuestionNumerique = {
@@ -1037,7 +1193,13 @@ async function genCourteMRUA(difficulte: Difficulte): Promise<QuestionCourte> {
     uniteAttendue: "m",
     reponseAttendue: Number(deplacementM.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `Δs = vᵢΔt + ½aΔt² = (${vi} × ${t}) + 0,5 × ${accelerationMS2.toFixed(2)} × ${t}² ≈ ${deplacementM.toFixed(1)} m.`,
+    explication: etapesCorrige({
+      donnees: [`vᵢ = ${vi} m/s`, `a = ${formatSig(accelerationMS2, 3)} m/s² (valeur exacte conservée pour le calcul)`, `Δt = ${t} s`],
+      formule: "Δs = vᵢΔt + ½aΔt²",
+      substitution: `Δs = (${vi} × ${t}) + 0,5 × ${accelerationMS2.toFixed(4)} × ${t}²`,
+      reponseValeur: deplacementM,
+      reponseUnite: "m",
+    }),
   };
 
   return {
@@ -1069,7 +1231,13 @@ async function genCourteChuteLibre(difficulte: Difficulte): Promise<QuestionCour
     uniteAttendue: "m/s",
     reponseAttendue: Number(vfMS.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `En chute libre, vf = vi + gΔt = 0 + 9,8 × ${t} ≈ ${vfMS.toFixed(2)} m/s.`,
+    explication: etapesCorrige({
+      donnees: [`vᵢ = 0 m/s (lâché sans élan)`, `g = 9,8 m/s²`, `Δt = ${t} s`],
+      formule: "v_f = vᵢ + gΔt",
+      substitution: `v_f = 0 + 9,8 × ${t}`,
+      reponseValeur: vfMS,
+      reponseUnite: "m/s",
+    }),
   };
 
   const sousQuestionHauteur: SousQuestionNumerique = {
@@ -1081,7 +1249,13 @@ async function genCourteChuteLibre(difficulte: Difficulte): Promise<QuestionCour
     uniteAttendue: "m",
     reponseAttendue: Number(deplacementM.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `Δs = viΔt + ½gΔt² = 0 + 0,5 × 9,8 × ${t}² ≈ ${deplacementM.toFixed(2)} m.`,
+    explication: etapesCorrige({
+      donnees: [`vᵢ = 0 m/s`, `g = 9,8 m/s²`, `Δt = ${t} s`],
+      formule: "Δs = vᵢΔt + ½gΔt²",
+      substitution: `Δs = 0 + 0,5 × 9,8 × ${t}²`,
+      reponseValeur: deplacementM,
+      reponseUnite: "m",
+    }),
   };
 
   return {
@@ -1113,7 +1287,13 @@ async function genCourtePlanIncline(difficulte: Difficulte): Promise<QuestionCou
     uniteAttendue: "m/s²",
     reponseAttendue: Number(accelerationMS2.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `La composante de l'accélération gravitationnelle parallèle au plan est a = g·sin(θ) = 9,8 × sin(${angle}°) ≈ ${accelerationMS2.toFixed(2)} m/s².`,
+    explication: etapesCorrige({
+      donnees: [`θ = ${angle}°`, `g = 9,8 m/s²`, "frottement négligeable"],
+      formule: "a = g·sin(θ)",
+      substitution: `a = 9,8 × sin(${angle}°)`,
+      reponseValeur: accelerationMS2,
+      reponseUnite: "m/s²",
+    }),
   };
 
   return {
@@ -1124,42 +1304,55 @@ async function genCourtePlanIncline(difficulte: Difficulte): Promise<QuestionCou
     conceptId: "phy5-cine-plan-incline",
     enonce,
     sousQuestions: [sousQuestion],
+    diagramme: { type: "plan-incline", angleDegres: angle },
   };
 }
 
 async function genCourteProjectile(difficulte: Difficulte): Promise<QuestionCourte> {
   const vHorizontale = Number(nombreAleatoire(difficulte, 3, 18).toFixed(1));
-  const t = Number(nombreAleatoire(difficulte, 0.3, 2.3).toFixed(1));
-  const { distanceHorizontaleM } = resoudreProjectileHorizontal({ vitesseHorizontaleMS: vHorizontale, dureeS: t });
-  const { chuteVerticaleM } = resoudreProjectileChuteVerticale({ dureeS: t });
+  const hauteurInitialeM = Number(nombreAleatoire(difficulte, 1.5, 25).toFixed(1));
+  const { dureeS } = resoudreProjectileTempsChute({ hauteurInitialeM });
+  const { distanceHorizontaleM } = resoudreProjectileHorizontal({ vitesseHorizontaleMS: vHorizontale, dureeS });
 
   const enonce = await miseEnSituation([
-    `La situation doit décrire un objet lancé horizontalement (ex. une balle du bord d'une table, un ballon d'une falaise) avec une vitesse horizontale de EXACTEMENT ${vHorizontale} m/s, qui reste en l'air pendant EXACTEMENT ${t} secondes avant de toucher le sol.`,
-    "N'effectue AUCUN calcul, ne mentionne aucune distance ni hauteur, ne révèle aucune réponse.",
+    `La situation doit décrire un objet lancé horizontalement (ex. une balle du bord d'une table, un ballon d'une falaise) avec une vitesse horizontale de EXACTEMENT ${vHorizontale} m/s, depuis une hauteur de EXACTEMENT ${hauteurInitialeM} m au-dessus du sol.`,
+    "N'effectue AUCUN calcul, ne mentionne aucun temps de vol ni distance, ne révèle aucune réponse.",
   ]);
+
+  const sousQuestionTemps: SousQuestionNumerique = {
+    id: "temps-vol",
+    typeReponse: "numerique",
+    demandeDemarche: true,
+    enonce: "Combien de temps cet objet reste-t-il en l'air avant de toucher le sol ?",
+    bareme: { pointsMax: 2 },
+    uniteAttendue: "s",
+    reponseAttendue: Number(dureeS.toFixed(2)),
+    toleranceRelative: 0.02,
+    explication: etapesCorrige({
+      donnees: [`h = ${hauteurInitialeM} m`, "vertical initial nul (lancement horizontal)", "g = 9,8 m/s²"],
+      formule: "Δt = √(2h / g)",
+      substitution: `Δt = √(2 × ${hauteurInitialeM} / 9,8)`,
+      reponseValeur: dureeS,
+      reponseUnite: "s",
+    }),
+  };
 
   const sousQuestionHorizontale: SousQuestionNumerique = {
     id: "distance-horizontale",
     typeReponse: "numerique",
     demandeDemarche: true,
-    enonce: "Quelle distance horizontale cet objet a-t-il parcourue avant de toucher le sol ?",
+    enonce: "Quelle distance horizontale (portée) cet objet a-t-il parcourue avant de toucher le sol ?",
     bareme: { pointsMax: 2 },
     uniteAttendue: "m",
     reponseAttendue: Number(distanceHorizontaleM.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `La composante horizontale du mouvement est un MRU : distance = vΔt = ${vHorizontale} × ${t} ≈ ${distanceHorizontaleM.toFixed(2)} m.`,
-  };
-
-  const sousQuestionVerticale: SousQuestionNumerique = {
-    id: "chute-verticale",
-    typeReponse: "numerique",
-    demandeDemarche: true,
-    enonce: "De quelle hauteur cet objet est-il tombé (composante verticale du mouvement) ?",
-    bareme: { pointsMax: 2 },
-    uniteAttendue: "m",
-    reponseAttendue: Number(chuteVerticaleM.toFixed(2)),
-    toleranceRelative: 0.02,
-    explication: `La composante verticale du mouvement est une chute libre (vitesse verticale initiale nulle) : chute = ½gΔt² = 0,5 × 9,8 × ${t}² ≈ ${chuteVerticaleM.toFixed(2)} m.`,
+    explication: etapesCorrige({
+      donnees: [`v_x = ${vHorizontale} m/s (constante)`, `Δt = ${formatSig(dureeS, 3)} s (calculé à la partie précédente, valeur exacte conservée)`],
+      formule: "Δx = v_xΔt",
+      substitution: `Δx = ${vHorizontale} × ${dureeS.toFixed(4)}`,
+      reponseValeur: distanceHorizontaleM,
+      reponseUnite: "m",
+    }),
   };
 
   return {
@@ -1169,7 +1362,15 @@ async function genCourteProjectile(difficulte: Difficulte): Promise<QuestionCour
     univers: "materiel",
     conceptId: "phy5-cine-projectiles",
     enonce,
-    sousQuestions: sousQuestionsParDifficulte(difficulte, [sousQuestionHorizontale, sousQuestionVerticale]),
+    sousQuestions: sousQuestionsParDifficulte(difficulte, [sousQuestionTemps, sousQuestionHorizontale]),
+    diagramme: {
+      type: "projectile",
+      horizontal: true,
+      viMS: vHorizontale,
+      angleDegres: 0,
+      hauteurInitialeM,
+      corrige: { porteeM: distanceHorizontaleM, tempsVolS: dureeS },
+    },
   };
 }
 
@@ -1242,7 +1443,13 @@ async function genCourteLoisNewton(difficulte: Difficulte): Promise<QuestionCour
     uniteAttendue: "N",
     reponseAttendue: Number(forceN.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `F = ma = ${masse} × ${acceleration} = ${forceN.toFixed(1)} N.`,
+    explication: etapesCorrige({
+      donnees: [`m = ${masse} kg`, `a = ${acceleration} m/s²`],
+      formule: "F = ma",
+      substitution: `F = ${masse} × ${acceleration}`,
+      reponseValeur: forceN,
+      reponseUnite: "N",
+    }),
   };
 
   const exemple = exempleLoiNewtonAleatoire();
@@ -1290,7 +1497,13 @@ async function genCourteFrottement(difficulte: Difficulte): Promise<QuestionCour
     uniteAttendue: "N",
     reponseAttendue: forceFrottementN,
     toleranceRelative: 0.01,
-    explication: `Force de frottement = force motrice - force résultante = ${forceMotrice} - ${forceResultante} = ${forceFrottementN} N.`,
+    explication: etapesCorrige({
+      donnees: [`F motrice = ${forceMotrice} N`, `F résultante (mesurée) = ${forceResultante} N`],
+      formule: "F frottement = F motrice - F résultante",
+      substitution: `F frottement = ${forceMotrice} - ${forceResultante}`,
+      reponseValeur: forceFrottementN,
+      reponseUnite: "N",
+    }),
   };
 
   return {
@@ -1328,7 +1541,13 @@ async function genCourteResultanteEquilibrante(difficulte: Difficulte): Promise<
     uniteAttendue: "N",
     reponseAttendue: resultante.resultanteN,
     toleranceRelative: 0.01,
-    explication: `Les deux forces agissent en sens opposés sur la même droite : résultante = |${f1} - ${f2}| = ${resultante.resultanteN} N, orientée ${sensTexte(resultante.sens)}.`,
+    explication: etapesCorrige({
+      donnees: [`F₁ = ${f1} N (droite)`, `F₂ = ${f2} N (gauche)`],
+      formule: "F résultante = |F₁ - F₂|, orientée vers la force la plus grande",
+      substitution: `F résultante = |${f1} - ${f2}|, orientée ${sensTexte(resultante.sens)}`,
+      reponseValeur: resultante.resultanteN,
+      reponseUnite: "N",
+    }),
   };
 
   const options: OptionChoix[] = melanger([
@@ -1375,7 +1594,13 @@ async function genCourteAccelerationGravitationnelle(difficulte: Difficulte): Pr
     uniteAttendue: "N",
     reponseAttendue: Number(poidsTerre.toFixed(1)),
     toleranceRelative: 0.01,
-    explication: `Sur Terre, g ≈ 9,8 m/s² : poids = mg = ${masse} × 9,8 = ${poidsTerre.toFixed(1)} N.`,
+    explication: etapesCorrige({
+      donnees: [`m = ${masse} kg`, "g (Terre) = 9,8 N/kg"],
+      formule: "Fg = mg",
+      substitution: `Fg = ${masse} × 9,8`,
+      reponseValeur: poidsTerre,
+      reponseUnite: "N",
+    }),
   };
 
   const sousQuestionLune: SousQuestionNumerique = {
@@ -1387,7 +1612,13 @@ async function genCourteAccelerationGravitationnelle(difficulte: Difficulte): Pr
     uniteAttendue: "N",
     reponseAttendue: Number(poidsLune.toFixed(1)),
     toleranceRelative: 0.01,
-    explication: `Sur la Lune, g ≈ 1,6 m/s² (environ 6 fois plus faible que sur Terre) : poids = mg = ${masse} × 1,6 = ${poidsLune.toFixed(1)} N. Notez que la masse de l'objet, elle, ne change pas.`,
+    explication: etapesCorrige({
+      donnees: [`m = ${masse} kg (la masse ne change pas d'un astre à l'autre)`, "g (Lune) = 1,6 N/kg (environ 6 fois plus faible que sur Terre)"],
+      formule: "Fg = mg",
+      substitution: `Fg = ${masse} × 1,6`,
+      reponseValeur: poidsLune,
+      reponseUnite: "N",
+    }),
   };
 
   return {
@@ -1474,7 +1705,13 @@ async function genCourteEnergieMecanique(difficulte: Difficulte): Promise<Questi
     uniteAttendue: "J",
     reponseAttendue: Number(energiePotentielleJ.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `Ep = mgh = ${masse} × 9,8 × ${hauteur} ≈ ${energiePotentielleJ.toFixed(1)} J.`,
+    explication: etapesCorrige({
+      donnees: [`m = ${masse} kg`, `h = ${hauteur} m`, "g = 9,8 m/s²"],
+      formule: "Ep = mgh",
+      substitution: `Ep = ${masse} × 9,8 × ${hauteur}`,
+      reponseValeur: energiePotentielleJ,
+      reponseUnite: "J",
+    }),
   };
 
   const sousQuestionEk: SousQuestionNumerique = {
@@ -1486,7 +1723,13 @@ async function genCourteEnergieMecanique(difficulte: Difficulte): Promise<Questi
     uniteAttendue: "J",
     reponseAttendue: Number(energieCinetiqueJ.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `Par conservation de l'énergie mécanique (sans frottement), toute l'énergie potentielle initiale se transforme en énergie cinétique : Ek = Ep = ${energiePotentielleJ.toFixed(1)} J (on retrouve la même valeur, aux arrondis près, via Ek = ½mv² avec v = √(2gh) ≈ ${vitesseFinaleMS.toFixed(2)} m/s).`,
+    explication: etapesCorrige({
+      donnees: [`Ep initiale = ${formatSig(energiePotentielleJ, 3)} J`, "aucun frottement (énergie mécanique conservée)"],
+      formule: "Ek finale = Ep initiale (conservation de l'énergie mécanique)",
+      substitution: `Ek = ${energiePotentielleJ.toFixed(4)} J (ce qui correspond à v = √(2gh) ≈ ${vitesseFinaleMS.toFixed(2)} m/s au sol)`,
+      reponseValeur: energieCinetiqueJ,
+      reponseUnite: "J",
+    }),
   };
 
   return {
@@ -1519,7 +1762,13 @@ async function genCourteHooke(difficulte: Difficulte): Promise<QuestionCourte> {
     uniteAttendue: "J",
     reponseAttendue: Number(energieJ.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `E = ½kΔℓ² = 0,5 × ${k} × ${deltaL}² ≈ ${energieJ.toFixed(2)} J.`,
+    explication: etapesCorrige({
+      donnees: [`k = ${k} N/m`, `Δℓ = ${deltaL} m`],
+      formule: "E = ½kΔℓ²",
+      substitution: `E = 0,5 × ${k} × ${deltaL}²`,
+      reponseValeur: energieJ,
+      reponseUnite: "J",
+    }),
   };
 
   return {
@@ -1552,7 +1801,13 @@ async function genCourtePuissanceMecanique(difficulte: Difficulte): Promise<Ques
     uniteAttendue: "W",
     reponseAttendue: Number(puissanceW.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `P = W / Δt = ${travail} / ${temps} ≈ ${puissanceW.toFixed(1)} W.`,
+    explication: etapesCorrige({
+      donnees: [`W = ${travail} J`, `Δt = ${temps} s`],
+      formule: "P = W / Δt",
+      substitution: `P = ${travail} / ${temps}`,
+      reponseValeur: puissanceW,
+      reponseUnite: "W",
+    }),
   };
 
   return {
@@ -1640,7 +1895,13 @@ async function genCourteIndiceRefraction(difficulte: Difficulte): Promise<Questi
     bareme: { pointsMax: 2 },
     reponseAttendue: Number(indice.toFixed(2)),
     toleranceRelative: 0.02,
-    explication: `n = c / v = (3,0 × 10⁸) / (${(vitesseMilieu / 1e8).toFixed(2)} × 10⁸) ≈ ${indice.toFixed(2)}.`,
+    explication: etapesCorrige({
+      donnees: [`c = 3,0 × 10⁸ m/s (vitesse de la lumière dans le vide)`, `v = ${(vitesseMilieu / 1e8).toFixed(2)} × 10⁸ m/s (vitesse dans le milieu)`],
+      formule: "n = c / v",
+      substitution: `n = (3,0 × 10⁸) / (${(vitesseMilieu / 1e8).toFixed(2)} × 10⁸)`,
+      reponseValeur: indice,
+      reponseUnite: "",
+    }),
   };
 
   return {
@@ -1674,7 +1935,13 @@ async function genCourteRefraction(difficulte: Difficulte): Promise<QuestionCour
     uniteAttendue: "°",
     reponseAttendue: Number(angle2Degres.toFixed(1)),
     toleranceRelative: 0.02,
-    explication: `Selon la loi de Snell-Descartes, n₁sinθ₁ = n₂sinθ₂ : sinθ₂ = (${n1} × sin${angle1}°) / ${n2}, donc θ₂ ≈ ${angle2Degres.toFixed(1)}°.`,
+    explication: etapesCorrige({
+      donnees: [`n₁ = ${n1}`, `θ₁ = ${angle1}°`, `n₂ = ${n2}`],
+      formule: "n₁sinθ₁ = n₂sinθ₂",
+      substitution: `sinθ₂ = (${n1} × sin${angle1}°) / ${n2} = ${((n1 * Math.sin((angle1 * Math.PI) / 180)) / n2).toFixed(4)}, donc θ₂ = arcsin(${((n1 * Math.sin((angle1 * Math.PI) / 180)) / n2).toFixed(4)})`,
+      reponseValeur: angle2Degres,
+      reponseUnite: "°",
+    }),
   };
 
   return {
@@ -1697,8 +1964,11 @@ async function genCourteImages(difficulte: Difficulte): Promise<QuestionCourte> 
   const { hauteurImageM } = resoudreHauteurImage({ grandissement, hauteurObjetM: hauteurObjet });
   const type = classifierTypeImage(distanceImageM);
 
+  const element: ElementOptique = Math.random() < 0.5 ? "lentille-convergente" : "miroir-concave";
+  const nomElement = element === "lentille-convergente" ? "lentille convergente" : "miroir concave";
+
   const enonce = await miseEnSituation([
-    `La situation doit décrire un objet de EXACTEMENT ${hauteurObjet} m de hauteur, placé à EXACTEMENT ${distanceObjet} m d'une lentille (ou d'un miroir) dont la distance focale est de EXACTEMENT ${f} m.`,
+    `La situation doit décrire un objet de EXACTEMENT ${hauteurObjet} m de hauteur, placé à EXACTEMENT ${distanceObjet} m d'une ${nomElement} dont la distance focale est de EXACTEMENT ${f} m.`,
     "N'effectue AUCUN calcul, ne révèle aucune réponse.",
   ]);
 
@@ -1711,7 +1981,13 @@ async function genCourteImages(difficulte: Difficulte): Promise<QuestionCourte> 
     uniteAttendue: "m",
     reponseAttendue: Number(distanceImageM.toFixed(2)),
     toleranceRelative: 0.03,
-    explication: `1/f = 1/dᵢ + 1/dₒ, donc dᵢ = 1 / (1/${f} - 1/${distanceObjet}) ≈ ${distanceImageM.toFixed(2)} m.`,
+    explication: etapesCorrige({
+      donnees: [`f = ${f} m`, `dₒ = ${distanceObjet} m`],
+      formule: "1/f = 1/dᵢ + 1/dₒ",
+      substitution: `dᵢ = 1 / (1/${f} - 1/${distanceObjet})`,
+      reponseValeur: distanceImageM,
+      reponseUnite: "m",
+    }),
   };
 
   const sousQuestionHauteur: SousQuestionNumerique = {
@@ -1723,7 +1999,13 @@ async function genCourteImages(difficulte: Difficulte): Promise<QuestionCourte> 
     uniteAttendue: "m",
     reponseAttendue: Number(hauteurImageM.toFixed(3)),
     toleranceRelative: 0.03,
-    explication: `Le grandissement Gr = -dᵢ/dₒ = -${distanceImageM.toFixed(2)}/${distanceObjet} ≈ ${grandissement.toFixed(2)}. Hauteur de l'image = Gr × hauteur de l'objet = ${grandissement.toFixed(2)} × ${hauteurObjet} ≈ ${hauteurImageM.toFixed(3)} m.`,
+    explication: etapesCorrige({
+      donnees: [`dᵢ = ${formatSig(distanceImageM, 3)} m`, `dₒ = ${distanceObjet} m`, `hₒ = ${hauteurObjet} m`],
+      formule: "Gr = -dᵢ/dₒ, puis hᵢ = Gr × hₒ",
+      substitution: `Gr = -${distanceImageM.toFixed(4)}/${distanceObjet} = ${grandissement.toFixed(4)}, puis hᵢ = ${grandissement.toFixed(4)} × ${hauteurObjet}`,
+      reponseValeur: hauteurImageM,
+      reponseUnite: "m",
+    }),
   };
 
   const options: OptionChoix[] = melanger([
@@ -1748,6 +2030,14 @@ async function genCourteImages(difficulte: Difficulte): Promise<QuestionCourte> 
     conceptId: "phy5-opt-images-caracteristiques",
     enonce,
     sousQuestions: sousQuestionsParDifficulte(difficulte, [sousQuestionDistance, sousQuestionHauteur, sousQuestionType]),
+    diagramme: {
+      type: "optique",
+      element,
+      fM: f,
+      doM: distanceObjet,
+      hoM: hauteurObjet,
+      corrige: { diM: distanceImageM, hiM: hauteurImageM },
+    },
   };
 }
 

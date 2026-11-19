@@ -4,6 +4,7 @@ import { useGenerationQuestion } from "../../hooks/useGenerationQuestion";
 import { EtatChargement, EtatErreur } from "../EtatsAsynchrones";
 import SousQuestionBloc from "../SousQuestionBloc";
 import QcmBlocUnique from "../QcmBlocUnique/QcmBlocUnique";
+import DiagrammeQuestion from "../DiagrammesPhysique/DiagrammeQuestion";
 import type { ResultatSousQuestion } from "../../types/question";
 import type { CoursSecondaire5, Difficulte } from "../../types/curriculumSecondaire5";
 
@@ -88,6 +89,12 @@ export default function PartieDeveloppementSecondaire5({
 
         {question && !chargement && !erreur && question.type === "courte" && (
           <>
+            {question.diagramme && (
+              <div className="diagramme-physique">
+                <DiagrammeQuestion diagramme={question.diagramme} montrerCorrige={toutesNotees} />
+              </div>
+            )}
+
             <p className="question-enonce">{question.enonce}</p>
 
             {question.sousQuestions.map((sq) => (

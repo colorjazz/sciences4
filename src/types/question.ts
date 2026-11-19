@@ -139,6 +139,51 @@ export interface ResultatSousQuestion {
 }
 
 // ============================================================
+// Diagrammes SVG optionnels (Physique 5e) — schéma affiché au-dessus
+// de l'énoncé, avec une variante enrichie révélée une fois toutes les
+// sous-questions notées (vecteurs de force, rayons principaux, etc.).
+// Jamais utilisé par ST/ATS (4e secondaire).
+// ============================================================
+
+export interface DiagrammePlanIncline {
+  type: "plan-incline";
+  angleDegres: number;
+  /** Présent seulement si une force motrice est appliquée le long du plan. */
+  forceMotriceN?: number;
+  /** Fournis uniquement pour le corrigé (vecteurs de force). */
+  corrige?: { fgxN: number; fgyN: number; fNN: number; ffN: number };
+}
+
+export interface DiagrammeVitesseTemps {
+  type: "vt-graph";
+  points: { t: number; v: number }[];
+}
+
+export interface DiagrammeProjectile {
+  type: "projectile";
+  horizontal: boolean;
+  viMS: number;
+  angleDegres: number;
+  hauteurInitialeM: number;
+  /** Fournis uniquement pour le corrigé (portée, temps de vol réels). */
+  corrige?: { porteeM: number; tempsVolS: number; hauteurMaxM?: number };
+}
+
+export type ElementOptique = "lentille-convergente" | "lentille-divergente" | "miroir-concave" | "miroir-convexe";
+
+export interface DiagrammeOptique {
+  type: "optique";
+  element: ElementOptique;
+  fM: number;
+  doM: number;
+  hoM: number;
+  /** Fournis uniquement pour le corrigé (image construite + rayons principaux). */
+  corrige?: { diM: number; hiM: number };
+}
+
+export type DiagrammeSchema = DiagrammePlanIncline | DiagrammeVitesseTemps | DiagrammeProjectile | DiagrammeOptique;
+
+// ============================================================
 // Section B — Résolution guidée : une mise en situation, puis une
 // batterie de sous-questions notées (comme les questions 16 à 20).
 // ============================================================
@@ -146,6 +191,8 @@ export interface ResultatSousQuestion {
 export interface QuestionCourte extends QuestionBase {
   type: "courte";
   sousQuestions: SousQuestionNotee[];
+  /** Schéma optionnel affiché au-dessus de l'énoncé (Physique 5e uniquement). */
+  diagramme?: DiagrammeSchema;
 }
 
 // ============================================================
