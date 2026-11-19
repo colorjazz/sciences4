@@ -52,6 +52,7 @@ import {
   classifierReaction,
   resoudreChaleurCalorimetre,
   resoudreChaleurMolaire,
+  affirmationEnergieTransformationAleatoire,
   type DiagrammeEnergetique,
 } from "../engines/energieChimieEngine";
 import { facteurVitesseAleatoire, BANQUE_FACTEURS_VITESSE, resoudreVitesseReaction } from "../engines/viteseReactionEngine";
@@ -699,6 +700,21 @@ async function genCourteCalorimetre(difficulte: Difficulte): Promise<QuestionCou
     enonce,
     sousQuestions: sousQuestionsParDifficulte(difficulte, [sousQuestionChaleur, sousQuestionMolaire]),
   };
+}
+
+async function genQcmEnergieTransformations(): Promise<QuestionQCMSimple> {
+  const a = affirmationEnergieTransformationAleatoire();
+  const enonce = await miseEnSituation([
+    "La situation doit évoquer une expérience ou une observation en chimie portant sur le bilan énergétique d'une réaction (laboratoire, diagramme énergétique, calorimètre).",
+    "Ne révèle aucune réponse.",
+  ]);
+  return construireQcmVraiFaux({
+    idPrefixe: "qcm-energie-transformations",
+    conceptId: "chi5-energie-diagramme",
+    enonce: `${enonce} Affirmation à évaluer : « ${a.affirmation} » Vrai ou faux ?`,
+    correcte: a.correcte,
+    explication: a.explication,
+  });
 }
 
 async function genAppariementEnergieChimie(difficulte: Difficulte): Promise<QuestionCourte> {
@@ -2129,6 +2145,7 @@ const GENERATEURS_SECONDAIRE5: GenerateurSecondaire5[] = [
   // --- Chimie 5e — Aspect énergétique des transformations ---
   { cours: ["CHIMIE5"], chapitreId: "energie-transformations", generer: genCourteDiagrammeEnergetique },
   { cours: ["CHIMIE5"], chapitreId: "energie-transformations", generer: genCourteCalorimetre },
+  { cours: ["CHIMIE5"], chapitreId: "energie-transformations", generer: genQcmEnergieTransformations },
   { cours: ["CHIMIE5"], chapitreId: "energie-transformations", generer: genAppariementEnergieChimie },
   // --- Chimie 5e — Vitesse de réaction ---
   { cours: ["CHIMIE5"], chapitreId: "vitesse-reaction", generer: genCourteFacteursVitesse },
