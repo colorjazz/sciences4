@@ -4,13 +4,19 @@ import ChapitreSelector from "./components/ChapitreSelector/ChapitreSelector";
 import PartieA from "./components/PartieA/PartieA";
 import PartieB from "./components/PartieB/PartieB";
 import PartieC from "./components/PartieC/PartieC";
+import PalierSelector from "./components/PalierSelector/PalierSelector";
+import CoursSecondaire5Selector from "./components/CoursSecondaire5Selector/CoursSecondaire5Selector";
+import ChapitreSelectorSimple from "./components/ChapitreSelectorSimple/ChapitreSelectorSimple";
+import PartieDeveloppementSecondaire5 from "./components/PartieDeveloppementSecondaire5/PartieDeveloppementSecondaire5";
 import { Logomark } from "./components/Logomark";
 import type { Parcours, SectionEpreuve } from "./types/curriculum";
 import { getStructureEpreuve } from "./types/curriculum";
+import type { CoursSecondaire5 } from "./types/curriculumSecondaire5";
+import { getCurriculumSecondaire5 } from "./types/curriculumSecondaire5";
 import { LIBELLES_MODULES } from "./utils/libellesPratique";
 import { chapitresDisponibles, sectionADuContenu } from "./utils/couverturePratique";
 
-type Vue = "parcours" | "chapitres" | "modules" | SectionEpreuve;
+type Vue = "palier" | "parcours" | "chapitres" | "modules" | SectionEpreuve | "cours5" | "chapitres5" | "pratique5";
 
 const ICON_ACCUEIL = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,7 +37,15 @@ const ICON_MODULES = (
 export default function App() {
   const [parcours, setParcours] = useState<Parcours | null>(null);
   const [chapitresSelectionnes, setChapitresSelectionnes] = useState<Set<string>>(new Set());
-  const [vue, setVue] = useState<Vue>("parcours");
+  const [cours5, setCours5] = useState<CoursSecondaire5 | null>(null);
+  const [chapitres5Selectionnes, setChapitres5Selectionnes] = useState<Set<string>>(new Set());
+  const [vue, setVue] = useState<Vue>("palier");
+  const [flowActif, setFlowActif] = useState<"4e" | "5e" | null>(null);
+
+  function choisirPalier(p: "4e" | "5e") {
+    setFlowActif(p);
+    setVue(p === "4e" ? "parcours" : "cours5");
+  }
 
   function choisirParcours(p: Parcours) {
     setParcours(p);
@@ -50,7 +64,26 @@ export default function App() {
     setVue("modules");
   }
 
-  const surModules = vue === "chapitres" || vue === "modules" || vue === "A" || vue === "B" || vue === "C";
+  function choisirCours5(c: CoursSecondaire5) {
+    setCours5(c);
+    setChapitres5Selectionnes(new Set(getCurriculumSecondaire5(c).chapitres.map((ch) => ch.id)));
+    setVue("chapitres5");
+  }
+
+  function confirmerChapitres5(selection: Set<string>) {
+    setChapitres5Selectionnes(selection);
+    setVue("pratique5");
+  }
+
+  const surModules =
+    vue === "chapitres" ||
+    vue === "modules" ||
+    vue === "A" ||
+    vue === "B" ||
+    vue === "C" ||
+    vue === "cours5" ||
+    vue === "chapitres5" ||
+    vue === "pratique5";
 
   return (
     <div className="app-shell">
@@ -58,22 +91,24 @@ export default function App() {
         <Logomark />
         <div>
           <span className="wordmark">sciences4</span>
-          <span className="eyebrow">Corrige.moi · 4e secondaire</span>
+          <span className="eyebrow">Corrige.moi · 4e et 5e secondaire</span>
         </div>
       </header>
 
-      {vue === "parcours" && (
+      {vue === "palier" && (
         <div className="hero-card">
           <span className="hero-badge">
-            <span aria-hidden="true">●</span> Sciences · 4e secondaire
+            <span aria-hidden="true">●</span> Sciences
           </span>
-          <h1>Prépare ton épreuve unique</h1>
+          <h1>Prépare-toi, à ton rythme</h1>
           <p className="hero-sub">
-            Choisis ton parcours (ST ou ATS), puis entraîne-toi module par
-            module, à ton rythme et autant de fois que tu veux.
+            Choisis ton année, puis ton cours — entraîne-toi module par
+            module, autant de fois que tu veux.
           </p>
         </div>
       )}
+
+      {vue === "palier" && <PalierSelector onConfirm={choisirPalier} />}
 
       {vue === "parcours" && <ParcoursSelector onConfirm={choisirParcours} />}
 
@@ -103,11 +138,32 @@ export default function App() {
       )}
       {vue === "C" && parcours && <PartieC parcours={parcours} onRetour={retourModules} />}
 
+      {vue === "cours5" && <CoursSecondaire5Selector onConfirm={choisirCours5} onRetour={() => setVue("palier")} />}
+
+      {vue === "chapitres5" && cours5 && (
+        <ChapitreSelectorSimple
+          eyebrowLabel={cours5 === "CHIMIE5" ? "Chimie 5e" : "Physique 5e"}
+          chapitres={getCurriculumSecondaire5(cours5).chapitres.map((c) => ({ id: c.id, titre: c.titre }))}
+          selectionInitiale={chapitres5Selectionnes}
+          onConfirm={confirmerChapitres5}
+          onRetour={() => setVue("cours5")}
+          libelleRetour="Changer de cours"
+        />
+      )}
+
+      {vue === "pratique5" && cours5 && (
+        <PartieDeveloppementSecondaire5
+          cours={cours5}
+          chapitresSelectionnes={chapitres5Selectionnes}
+          onRetour={() => setVue("chapitres5")}
+        />
+      )}
+
       <nav className="bottom-nav" aria-label="Navigation principale">
         <button
           type="button"
-          className={vue === "parcours" ? "active" : ""}
-          onClick={() => setVue("parcours")}
+          className={vue === "palier" ? "active" : ""}
+          onClick={() => setVue("palier")}
         >
           {ICON_ACCUEIL}
           Accueil
@@ -115,7 +171,10 @@ export default function App() {
         <button
           type="button"
           className={surModules ? "active" : ""}
-          onClick={() => setVue(parcours ? "modules" : "parcours")}
+          onClick={() => {
+            if (flowActif === "5e") setVue(cours5 ? "chapitres5" : "cours5");
+            else setVue(parcours ? "modules" : "palier");
+          }}
         >
           {ICON_MODULES}
           Modules
