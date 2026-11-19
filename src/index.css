@@ -1424,6 +1424,18 @@ button.ghost:hover {
   display: none;
 }
 
+.type-exercice-grille {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.chapitre-carte-description {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--graphite-soft);
+  line-height: 1.35;
+  padding-right: 1.5rem;
+}
+
 .chapitre-badge {
   margin-top: 0.5rem;
   align-self: flex-start;

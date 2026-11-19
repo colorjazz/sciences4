@@ -34,7 +34,7 @@ import type {
   OptionChoix,
   ElementOptique,
 } from "../types/question";
-import type { CoursSecondaire5, Difficulte } from "../types/curriculumSecondaire5";
+import type { CoursSecondaire5, Difficulte, TypeExerciceSecondaire5 } from "../types/curriculumSecondaire5";
 import { demanderMiseEnSituation } from "../ai/geminiClient";
 import {
   resoudreGazLoiGeneralePression,
@@ -2104,6 +2104,19 @@ interface GenerateurSecondaire5 {
   generer: (difficulte: Difficulte) => Promise<ResultatGenerateur5>;
 }
 
+/**
+ * Déduit le type d'exercice (QCM rapide / appariement / développement) du
+ * nom de la fonction génératrice, plutôt que de l'annoter manuellement sur
+ * chaque entrée de GENERATEURS_SECONDAIRE5 — la convention de nommage
+ * (genQcm*, genAppariement*, genCourte*) est déjà strictement respectée
+ * dans ce fichier.
+ */
+function typeExerciceDe(generer: (difficulte: Difficulte) => Promise<ResultatGenerateur5>): TypeExerciceSecondaire5 {
+  if (generer.name.startsWith("genQcm")) return "qcm";
+  if (generer.name.startsWith("genAppariement")) return "appariement";
+  return "developpement";
+}
+
 const GENERATEURS_SECONDAIRE5: GenerateurSecondaire5[] = [
   // --- Chimie 5e — Gaz ---
   { cours: ["CHIMIE5"], chapitreId: "gaz", generer: genCourteLoiGenerale },
@@ -2165,15 +2178,19 @@ const GENERATEURS_SECONDAIRE5: GenerateurSecondaire5[] = [
 export async function genererQuestionDeveloppementSecondaire5(
   cours: CoursSecondaire5,
   chapitresSelectionnes: Set<string> | undefined,
-  difficulte: Difficulte
+  difficulte: Difficulte,
+  typesExercice?: Set<TypeExerciceSecondaire5>
 ): Promise<ResultatGenerateur5> {
   const admissiblesCours = GENERATEURS_SECONDAIRE5.filter((g) => g.cours.includes(cours));
-  const disponibles = chapitresSelectionnes
+  const admissiblesChapitres = chapitresSelectionnes
     ? admissiblesCours.filter((g) => chapitresSelectionnes.has(g.chapitreId))
     : admissiblesCours;
+  const disponibles = typesExercice
+    ? admissiblesChapitres.filter((g) => typesExercice.has(typeExerciceDe(g.generer)))
+    : admissiblesChapitres;
 
   if (disponibles.length === 0) {
-    throw new Error("Aucune question disponible pour les chapitres sélectionnés.");
+    throw new Error("Aucune question disponible pour les chapitres et le type d'exercice sélectionnés.");
   }
 
   const entree = disponibles[Math.floor(Math.random() * disponibles.length)];

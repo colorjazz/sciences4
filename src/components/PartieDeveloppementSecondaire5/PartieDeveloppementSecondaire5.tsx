@@ -6,12 +6,13 @@ import SousQuestionBloc from "../SousQuestionBloc";
 import QcmBlocUnique from "../QcmBlocUnique/QcmBlocUnique";
 import DiagrammeQuestion from "../DiagrammesPhysique/DiagrammeQuestion";
 import type { ResultatSousQuestion } from "../../types/question";
-import type { CoursSecondaire5, Difficulte } from "../../types/curriculumSecondaire5";
+import type { CoursSecondaire5, Difficulte, TypeExerciceSecondaire5 } from "../../types/curriculumSecondaire5";
 
 interface PartieDeveloppementSecondaire5Props {
   cours: CoursSecondaire5;
   chapitresSelectionnes: Set<string>;
   difficulte: Difficulte;
+  typesExercice: Set<TypeExerciceSecondaire5>;
   onRetour: () => void;
 }
 
@@ -21,10 +22,11 @@ export default function PartieDeveloppementSecondaire5({
   cours,
   chapitresSelectionnes,
   difficulte,
+  typesExercice,
   onRetour,
 }: PartieDeveloppementSecondaire5Props) {
   const { donnee: question, chargement, erreur, regenerer } = useGenerationQuestion(() =>
-    genererQuestionDeveloppementSecondaire5(cours, chapitresSelectionnes, difficulte)
+    genererQuestionDeveloppementSecondaire5(cours, chapitresSelectionnes, difficulte, typesExercice)
   );
   const [resultats, setResultats] = useState<Record<string, ResultatSousQuestion>>({});
   const [pointsTotal, setPointsTotal] = useState(0);
@@ -58,7 +60,7 @@ export default function PartieDeveloppementSecondaire5({
     <div className="panel">
       <div className="module-header">
         <button className="retour-lien" onClick={onRetour} type="button">
-          ← Chapitres
+          ← Retour
         </button>
         {pointsMaxTotal > 0 && (
           <span className="compteur">

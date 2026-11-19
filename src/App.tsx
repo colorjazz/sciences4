@@ -8,16 +8,29 @@ import PalierSelector from "./components/PalierSelector/PalierSelector";
 import CoursSecondaire5Selector from "./components/CoursSecondaire5Selector/CoursSecondaire5Selector";
 import ChapitreSelectorSimple from "./components/ChapitreSelectorSimple/ChapitreSelectorSimple";
 import DifficulteSelector5 from "./components/DifficulteSelector5/DifficulteSelector5";
+import TypeExerciceSelector5 from "./components/TypeExerciceSelector5/TypeExerciceSelector5";
 import PartieDeveloppementSecondaire5 from "./components/PartieDeveloppementSecondaire5/PartieDeveloppementSecondaire5";
 import { Logomark } from "./components/Logomark";
 import type { Parcours, SectionEpreuve } from "./types/curriculum";
 import { getStructureEpreuve } from "./types/curriculum";
-import type { CoursSecondaire5, Difficulte } from "./types/curriculumSecondaire5";
+import type { CoursSecondaire5, Difficulte, TypeExerciceSecondaire5 } from "./types/curriculumSecondaire5";
 import { getCurriculumSecondaire5 } from "./types/curriculumSecondaire5";
 import { LIBELLES_MODULES } from "./utils/libellesPratique";
 import { chapitresDisponibles, sectionADuContenu } from "./utils/couverturePratique";
 
-type Vue = "palier" | "parcours" | "chapitres" | "modules" | SectionEpreuve | "cours5" | "chapitres5" | "difficulte5" | "pratique5";
+type Vue =
+  | "palier"
+  | "parcours"
+  | "chapitres"
+  | "modules"
+  | SectionEpreuve
+  | "cours5"
+  | "chapitres5"
+  | "difficulte5"
+  | "typeExercice5"
+  | "pratique5";
+
+const TOUS_TYPES_EXERCICE_5: Set<TypeExerciceSecondaire5> = new Set(["developpement", "qcm", "appariement"]);
 
 const ICON_ACCUEIL = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -41,6 +54,7 @@ export default function App() {
   const [cours5, setCours5] = useState<CoursSecondaire5 | null>(null);
   const [chapitres5Selectionnes, setChapitres5Selectionnes] = useState<Set<string>>(new Set());
   const [difficulte5, setDifficulte5] = useState<Difficulte>("moyen");
+  const [typesExercice5Selectionnes, setTypesExercice5Selectionnes] = useState<Set<TypeExerciceSecondaire5>>(TOUS_TYPES_EXERCICE_5);
   const [vue, setVue] = useState<Vue>("palier");
   const [flowActif, setFlowActif] = useState<"4e" | "5e" | null>(null);
 
@@ -79,6 +93,11 @@ export default function App() {
 
   function confirmerDifficulte5(d: Difficulte) {
     setDifficulte5(d);
+    setVue("typeExercice5");
+  }
+
+  function confirmerTypeExercice5(selection: Set<TypeExerciceSecondaire5>) {
+    setTypesExercice5Selectionnes(selection);
     setVue("pratique5");
   }
 
@@ -91,6 +110,7 @@ export default function App() {
     vue === "cours5" ||
     vue === "chapitres5" ||
     vue === "difficulte5" ||
+    vue === "typeExercice5" ||
     vue === "pratique5";
 
   return (
@@ -163,12 +183,21 @@ export default function App() {
         <DifficulteSelector5 onConfirm={confirmerDifficulte5} onRetour={() => setVue("chapitres5")} />
       )}
 
+      {vue === "typeExercice5" && cours5 && (
+        <TypeExerciceSelector5
+          selectionInitiale={typesExercice5Selectionnes}
+          onConfirm={confirmerTypeExercice5}
+          onRetour={() => setVue("difficulte5")}
+        />
+      )}
+
       {vue === "pratique5" && cours5 && (
         <PartieDeveloppementSecondaire5
           cours={cours5}
           chapitresSelectionnes={chapitres5Selectionnes}
           difficulte={difficulte5}
-          onRetour={() => setVue("difficulte5")}
+          typesExercice={typesExercice5Selectionnes}
+          onRetour={() => setVue("typeExercice5")}
         />
       )}
 

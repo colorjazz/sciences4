@@ -38,6 +38,13 @@ export type CoursSecondaire5 = "CHIMIE5" | "PHYSIQUE5";
  */
 export type Difficulte = "facile" | "moyen" | "difficile";
 
+/**
+ * Type d'exercice choisi par l'élève après la difficulté (voir
+ * TypeExerciceSelector5). Restreint les générateurs tirés dans
+ * developpementSecondaire5Generator.ts — voir typeExerciceDe().
+ */
+export type TypeExerciceSecondaire5 = "qcm" | "appariement" | "developpement";
+
 export interface ChapitreSecondaire5 {
   id: string;
   titre: string;
