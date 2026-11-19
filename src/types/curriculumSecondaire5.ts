@@ -30,6 +30,14 @@ import type { ConceptPrescrit, Formule } from "./curriculum";
 
 export type CoursSecondaire5 = "CHIMIE5" | "PHYSIQUE5";
 
+/**
+ * Niveau de difficulté choisi par l'élève avant de pratiquer (voir
+ * DifficulteSelector5). Contrôle l'ampleur et la précision des valeurs
+ * générées dans developpementSecondaire5Generator.ts, pas la portée
+ * des concepts eux-mêmes (toujours strictement celle de ce fichier).
+ */
+export type Difficulte = "facile" | "moyen" | "difficile";
+
 export interface ChapitreSecondaire5 {
   id: string;
   titre: string;
