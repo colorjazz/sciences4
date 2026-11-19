@@ -98,8 +98,8 @@ export default function App() {
       <header className="app-header">
         <Logomark />
         <div>
-          <span className="wordmark">sciences4</span>
-          <span className="eyebrow">Corrige.moi · 4e et 5e secondaire</span>
+          <span className="wordmark">Atomisé</span>
+          <span className="eyebrow">4e et 5e secondaire</span>
         </div>
       </header>
 
